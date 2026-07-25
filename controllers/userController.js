@@ -313,6 +313,29 @@ exports.updateUser = async (req, res) => {
    DELETE USER
 =========================================================== */
 
+// exports.deleteUser = async (req, res) => {
+//   try {
+//     const user = await User.findById(req.params.id);
+
+//     if (!user) {
+//       return res.status(404).json({
+//         message: "User not found.",
+//       });
+//     }
+
+//     await user.deleteOne();
+
+//     res.json({
+//       success: true,
+//       message: "User deleted successfully.",
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// };
+
 exports.deleteUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
@@ -320,6 +343,14 @@ exports.deleteUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         message: "User not found.",
+      });
+    }
+
+    // Prevent deletion of the protected account
+    if (user.email && user.email.toLowerCase() === "john.smith@gmail.com") {
+      return res.status(403).json({
+        success: false,
+        message: "This user account cannot be deleted.",
       });
     }
 

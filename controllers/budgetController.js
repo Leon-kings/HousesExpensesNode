@@ -26,22 +26,11 @@ const createNotification = async (email, title, message, type, severity = 'mediu
 // @access  Private
 exports.getBudgets = async (req, res) => {
   try {
-    const { email, month, year, category } = req.query;
+    const { month, year, category } = req.query;
 
     const query = {};
-    
-    if (email) {
-      query.email = email.toLowerCase();
-    } else if (req.user && req.user.email) {
-      query.email = req.user.email.toLowerCase();
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
 
-    if (month !== undefined && month !== '') {
+    if (month !== undefined && month !== "") {
       query.month = parseInt(month);
     }
 
@@ -49,17 +38,29 @@ exports.getBudgets = async (req, res) => {
       query.year = parseInt(year);
     }
 
-    if (category && category !== 'all') {
+    if (category && category !== "all") {
       query.category = category;
     }
 
     const budgets = await Budget.find(query).sort({ category: 1 });
 
     // Calculate totals
-    const totalAllocated = budgets.reduce((sum, b) => sum + b.allocatedAmount, 0);
-    const totalSpent = budgets.reduce((sum, b) => sum + (b.spentAmount || 0), 0);
+    const totalAllocated = budgets.reduce(
+      (sum, b) => sum + b.allocatedAmount,
+      0
+    );
+
+    const totalSpent = budgets.reduce(
+      (sum, b) => sum + (b.spentAmount || 0),
+      0
+    );
+
     const totalRemaining = totalAllocated - totalSpent;
-    const overallPercentage = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
+
+    const overallPercentage =
+      totalAllocated > 0
+        ? (totalSpent / totalAllocated) * 100
+        : 0;
 
     res.status(200).json({
       success: true,
@@ -70,13 +71,19 @@ exports.getBudgets = async (req, res) => {
         totalSpent,
         totalRemaining,
         overallPercentage,
-        status: overallPercentage > 100 ? 'over-budget' : 
-                overallPercentage > 80 ? 'approaching-limit' : 
-                overallPercentage < 50 && totalSpent > 0 ? 'under-budget' : 'on-track',
+        status:
+          overallPercentage > 100
+            ? "over-budget"
+            : overallPercentage > 80
+            ? "approaching-limit"
+            : overallPercentage < 50 && totalSpent > 0
+            ? "under-budget"
+            : "on-track",
       },
     });
   } catch (error) {
-    console.error('Get budgets error:', error);
+    console.error("Get budgets error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch budgets",
