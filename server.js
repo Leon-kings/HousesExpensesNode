@@ -15,6 +15,11 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const householdRoutes = require("./routes/householdRoutes");
 const expenseRoutes = require('./routes/expenseRoutes');
 
+const incomeRoutes = require('./routes/incomeRoutes');
+const budgetRoutes = require('./routes/budgetRoutes');
+const savingsRoutes = require('./routes/savingsRoutes');
+const incameNotificationRoutes = require('./routes/incameNotificationRoutes');
+
 
 /* ---------------- APP ---------------- */
 const app = express();
@@ -33,6 +38,11 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/households", householdRoutes);
 app.use('/api/expenses', expenseRoutes);
+
+app.use('/api/incomes', incomeRoutes);
+app.use('/api/budgets', budgetRoutes);
+app.use('/api/savings', savingsRoutes);
+app.use('/api/notifications', incameNotificationRoutes);
 
 /* ---------------- HEALTH CHECK ---------------- */
 app.get("/health", (req, res) => { 
