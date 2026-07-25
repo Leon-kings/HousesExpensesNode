@@ -1,172 +1,172 @@
-const Notification = require("../models/Notification");
+            const Notification = require("../models/Notification");
 
-/* ===========================================
-   Get User Notifications
-=========================================== */
+            /* ===========================================
+               Get User Notifications
+            =========================================== */
 
-exports.getNotifications = async (req,res)=>{
+            exports.getNotifications = async (req,res)=>{
 
-try{
+            try{
 
-const notifications = await Notification.find({
-    userEmail:req.params.email
-})
-.sort({createdAt:-1});
+            const notifications = await Notification.find({
+               userEmail:req.params.email
+            })
+            .sort({createdAt:-1});
 
-res.json({
-success:true,
-notifications
-});
+            res.json({
+            success:true,
+            notifications
+            });
 
-}catch(error){
+            }catch(error){
 
-res.status(500).json({
-success:false,
-message:error.message
-});
+            res.status(500).json({
+            success:false,
+            message:error.message
+            });
 
-}
+            }
 
-};
+            };
 
 
-/* ===========================================
-   Get Notification By ID
-=========================================== */
+            /* ===========================================
+               Get Notification By ID
+            =========================================== */
 
-exports.getNotification = async(req,res)=>{
+            exports.getNotification = async(req,res)=>{
 
-try{
+            try{
 
-const notification = await Notification.findById(req.params.id);
+            const notification = await Notification.findById(req.params.id);
 
-if(!notification){
+            if(!notification){
 
-return res.status(404).json({
-success:false,
-message:"Notification not found"
-});
+            return res.status(404).json({
+            success:false,
+            message:"Notification not found"
+            });
 
-}
+            }
 
-res.json(notification);
+            res.json(notification);
 
-}catch(error){
+            }catch(error){
 
-res.status(500).json({
-success:false,
-message:error.message
-});
+            res.status(500).json({
+            success:false,
+            message:error.message
+            });
 
-}
+            }
 
-};
+            };
 
 
-/* ===========================================
-   Mark As Read
-=========================================== */
+            /* ===========================================
+               Mark As Read
+            =========================================== */
 
-exports.markAsRead = async(req,res)=>{
+            exports.markAsRead = async(req,res)=>{
 
-try{
+            try{
 
-const notification = await Notification.findById(req.params.id);
+            const notification = await Notification.findById(req.params.id);
 
-if(!notification){
+            if(!notification){
 
-return res.status(404).json({
-success:false,
-message:"Notification not found"
-});
+            return res.status(404).json({
+            success:false,
+            message:"Notification not found"
+            });
 
-}
+            }
 
-notification.isRead=true;
+            notification.isRead=true;
 
-await notification.save();
+            await notification.save();
 
-res.json({
+            res.json({
 
-success:true,
-message:"Notification marked as read."
+            success:true,
+            message:"Notification marked as read."
 
-});
+            });
 
-}catch(error){
+            }catch(error){
 
-res.status(500).json({
-success:false,
-message:error.message
-});
+            res.status(500).json({
+            success:false,
+            message:error.message
+            });
 
-}
+            }
 
-};
+            };
 
 
-/* ===========================================
-   Delete Notification
-=========================================== */
+            /* ===========================================
+               Delete Notification
+            =========================================== */
 
-exports.deleteNotification = async(req,res)=>{
+            exports.deleteNotification = async(req,res)=>{
 
-try{
+            try{
 
-await Notification.findByIdAndDelete(req.params.id);
+            await Notification.findByIdAndDelete(req.params.id);
 
-res.json({
+            res.json({
 
-success:true,
-message:"Notification deleted."
+            success:true,
+            message:"Notification deleted."
 
-});
+            });
 
-}catch(error){
+            }catch(error){
 
-res.status(500).json({
-success:false,
-message:error.message
-});
+            res.status(500).json({
+            success:false,
+            message:error.message
+            });
 
-}
+            }
 
-};
+            };
 
 
-/* ===========================================
-   Statistics
-=========================================== */
+            /* ===========================================
+               Statistics
+            =========================================== */
 
-exports.statistics = async(req,res)=>{
+            exports.statistics = async(req,res)=>{
 
-try{
+            try{
 
-const total = await Notification.countDocuments();
+            const total = await Notification.countDocuments();
 
-const unread = await Notification.countDocuments({
-isRead:false
-});
+            const unread = await Notification.countDocuments({
+            isRead:false
+            });
 
-const read = await Notification.countDocuments({
-isRead:true
-});
+            const read = await Notification.countDocuments({
+            isRead:true
+            });
 
-res.json({
+            res.json({
 
-total,
-read,
-unread
+            total,
+            read,
+            unread
 
-});
+            });
 
-}catch(error){
+            }catch(error){
 
-res.status(500).json({
-success:false,
-message:error.message
-});
+            res.status(500).json({
+            success:false,
+            message:error.message
+            });
 
-}
+            }
 
-};
+            };
