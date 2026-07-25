@@ -25,35 +25,38 @@ const createNotification = async (email, title, message, type, severity = 'mediu
 // @access  Private
 exports.getSavings = async (req, res) => {
   try {
-    const { email, category, isCompleted } = req.query;
+    const { category, isCompleted } = req.query;
 
     const query = {};
-    
-    if (email) {
-      query.email = email.toLowerCase();
-    } else if (req.user && req.user.email) {
-      query.email = req.user.email.toLowerCase();
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
 
-    if (category && category !== 'all') {
+    if (category && category !== "all") {
       query.category = category;
     }
 
     if (isCompleted !== undefined) {
-      query.isCompleted = isCompleted === 'true';
+      query.isCompleted = isCompleted === "true";
     }
 
-    const savings = await Savings.find(query).sort({ priority: 1, createdAt: -1 });
+    const savings = await Savings.find(query).sort({
+      priority: 1,
+      createdAt: -1,
+    });
 
     // Calculate totals
-    const totalTarget = savings.reduce((sum, s) => sum + s.targetAmount, 0);
-    const totalCurrent = savings.reduce((sum, s) => sum + s.currentAmount, 0);
-    const overallProgress = totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0;
+    const totalTarget = savings.reduce(
+      (sum, s) => sum + s.targetAmount,
+      0
+    );
+
+    const totalCurrent = savings.reduce(
+      (sum, s) => sum + s.currentAmount,
+      0
+    );
+
+    const overallProgress =
+      totalTarget > 0
+        ? (totalCurrent / totalTarget) * 100
+        : 0;
 
     res.status(200).json({
       success: true,
@@ -63,12 +66,13 @@ exports.getSavings = async (req, res) => {
         totalTarget,
         totalCurrent,
         overallProgress,
-        completedCount: savings.filter(s => s.isCompleted).length,
-        inProgressCount: savings.filter(s => !s.isCompleted).length,
+        completedCount: savings.filter((s) => s.isCompleted).length,
+        inProgressCount: savings.filter((s) => !s.isCompleted).length,
       },
     });
   } catch (error) {
-    console.error('Get savings error:', error);
+    console.error("Get savings error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch savings goals",

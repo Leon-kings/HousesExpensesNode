@@ -85,21 +85,18 @@ const updateBudgetSpent = async (email, category, amount, month, year) => {
 // @access  Private
 exports.getIncomes = async (req, res) => {
   try {
-    const { email, category, source, startDate, endDate, search, month, year } = req.query;
+    const {
+      category,
+      source,
+      startDate,
+      endDate,
+      search,
+      month,
+      year,
+    } = req.query;
 
     // Build query
     const query = {};
-    
-    if (email) {
-      query.email = email.toLowerCase();
-    } else if (req.user && req.user.email) {
-      query.email = req.user.email.toLowerCase();
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
 
     if (category && category !== "all") {
       query.category = category;
@@ -121,40 +118,62 @@ exports.getIncomes = async (req, res) => {
         { category: { $regex: search, $options: "i" } },
         { source: { $regex: search, $options: "i" } },
         { user: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
       ];
     }
 
-    const incomes = await Income.find(query).sort({ date: -1, createdAt: -1 });
+    // Fetch all matching incomes
+    const incomes = await Income.find(query).sort({
+      date: -1,
+      createdAt: -1,
+    });
 
-    // Get budget summary for the current month
-    const currentMonth = month !== undefined ? parseInt(month) : new Date().getMonth();
-    const currentYear = year ? parseInt(year) : new Date().getFullYear();
+    // Current month/year
+    const currentMonth =
+      month !== undefined ? parseInt(month) : new Date().getMonth();
+    const currentYear = year
+      ? parseInt(year)
+      : new Date().getFullYear();
 
+    // Fetch ALL budgets (no email filter)
     const budgets = await Budget.find({
-      email: query.email,
       month: currentMonth,
       year: currentYear,
     });
 
-    // Calculate total income for the month
-    const monthIncomes = incomes.filter(inc => {
+    // Calculate monthly income
+    const monthIncomes = incomes.filter((inc) => {
       const d = new Date(inc.date);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      return (
+        d.getMonth() === currentMonth &&
+        d.getFullYear() === currentYear
+      );
     });
 
-    const totalMonthlyIncome = monthIncomes.reduce((sum, inc) => sum + inc.amount, 0);
-    const totalBudgeted = budgets.reduce((sum, b) => sum + b.allocatedAmount, 0);
-    const totalSpent = budgets.reduce((sum, b) => sum + (b.spentAmount || 0), 0);
+    const totalMonthlyIncome = monthIncomes.reduce(
+      (sum, inc) => sum + inc.amount,
+      0
+    );
+
+    const totalBudgeted = budgets.reduce(
+      (sum, b) => sum + b.allocatedAmount,
+      0
+    );
+
+    const totalSpent = budgets.reduce(
+      (sum, b) => sum + (b.spentAmount || 0),
+      0
+    );
+
     const remainingBudget = totalBudgeted - totalSpent;
 
-    // Get budget summary by category
-    const budgetSummary = budgets.map(budget => ({
+    const budgetSummary = budgets.map((budget) => ({
       category: budget.category,
       allocated: budget.allocatedAmount,
       spent: budget.spentAmount || 0,
       remaining: budget.remainingAmount || 0,
       percentageUsed: budget.percentageUsed || 0,
-      status: budget.status || 'on-track',
+      status: budget.status || "on-track",
     }));
 
     res.status(200).json({
@@ -166,12 +185,15 @@ exports.getIncomes = async (req, res) => {
         totalSpent,
         remainingBudget,
         totalMonthlyIncome,
-        savingsRate: totalMonthlyIncome > 0 ? ((totalMonthlyIncome - totalSpent) / totalMonthlyIncome) * 100 : 0,
+        savingsRate:
+          totalMonthlyIncome > 0
+            ? ((totalMonthlyIncome - totalSpent) / totalMonthlyIncome) * 100
+            : 0,
         categories: budgetSummary,
       },
     });
   } catch (error) {
-    console.error('Get incomes error:', error);
+    console.error("Get incomes error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch incomes",
