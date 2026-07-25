@@ -6,18 +6,15 @@ const mongoose = require('mongoose');
 // @access  Private
 exports.getExpenses = async (req, res) => {
   try {
-    const { email, category, type, startDate, endDate, search } = req.query;
+    const {
+      category,
+      type,
+      startDate,
+      endDate,
+      search,
+    } = req.query;
 
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
-
-    const query = {
-      email: email.toLowerCase(),
-    };
+    const query = {};
 
     if (category && category !== "all") {
       query.category = category;
@@ -38,7 +35,9 @@ exports.getExpenses = async (req, res) => {
       query.$or = [
         { description: { $regex: search, $options: "i" } },
         { category: { $regex: search, $options: "i" } },
+        { type: { $regex: search, $options: "i" } },
         { user: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -53,6 +52,8 @@ exports.getExpenses = async (req, res) => {
       data: expenses,
     });
   } catch (error) {
+    console.error("Get expenses error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch expenses",
