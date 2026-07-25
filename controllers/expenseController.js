@@ -6,61 +6,56 @@ const mongoose = require('mongoose');
 // @access  Private
 exports.getExpenses = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { category, type, startDate, endDate, search } = req.query;
+    const { email, category, type, startDate, endDate, search } = req.query;
 
-    // Build query
-    const query = { userId: mongoose.Types.ObjectId(userId) };
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
 
-    // Filter by category
-    if (category && category !== 'all') {
+    const query = {
+      email: email.toLowerCase(),
+    };
+
+    if (category && category !== "all") {
       query.category = category;
     }
 
-    // Filter by type
-    if (type && type !== 'all') {
+    if (type && type !== "all") {
       query.type = type;
     }
 
-    // Filter by date range
     if (startDate || endDate) {
       query.date = {};
-      if (startDate) {
-        query.date.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        query.date.$lte = new Date(endDate);
-      }
+
+      if (startDate) query.date.$gte = new Date(startDate);
+      if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    // Search by description or user
     if (search) {
       query.$or = [
-        { description: { $regex: search, $options: 'i' } },
-        { user: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+        { user: { $regex: search, $options: "i" } },
       ];
     }
 
-    // Execute query
-    const expenses = await Expense.find(query)
-      .sort({ date: -1, createdAt: -1 })
-      .lean();
-
-    // Get statistics
-    const stats = await Expense.getStats(userId);
+    const expenses = await Expense.find(query).sort({
+      date: -1,
+      createdAt: -1,
+    });
 
     res.status(200).json({
       success: true,
       count: expenses.length,
       data: expenses,
-      stats,
     });
   } catch (error) {
-    console.error('Get expenses error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch expenses',
+      message: "Failed to fetch expenses",
       error: error.message,
     });
   }
@@ -71,15 +66,12 @@ exports.getExpenses = async (req, res) => {
 // @access  Private
 exports.getExpense = async (req, res) => {
   try {
-    const expense = await Expense.findOne({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
+    const expense = await Expense.findById(req.params.id);
 
     if (!expense) {
       return res.status(404).json({
         success: false,
-        message: 'Expense not found',
+        message: "Expense not found",
       });
     }
 
@@ -88,10 +80,36 @@ exports.getExpense = async (req, res) => {
       data: expense,
     });
   } catch (error) {
-    console.error('Get expense error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch expense',
+      message: "Failed to fetch expense",
+      error: error.message,
+    });
+  }
+};
+
+
+// @desc    Get expenses by user email
+// @route   GET /api/expenses/email/:email
+// @access  Private
+exports.getExpensesByEmail = async (req, res) => {
+  try {
+    const expenses = await Expense.find({
+      email: req.params.email.toLowerCase(),
+    }).sort({
+      date: -1,
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      success: true,
+      count: expenses.length,
+      data: expenses,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch expenses",
       error: error.message,
     });
   }
@@ -102,59 +120,49 @@ exports.getExpense = async (req, res) => {
 // @access  Private
 exports.createExpense = async (req, res) => {
   try {
-    const { description, category, type, amount, date, user } = req.body;
+    const {
+      description,
+      category,
+      type,
+      amount,
+      date,
+      user,
+      email,
+    } = req.body;
 
-    // Validate required fields
-    if (!description || !category || !amount || !date || !user) {
+    if (
+      !description ||
+      !category ||
+      !amount ||
+      !date ||
+      !user ||
+      !email
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required fields',
+        message: "All fields are required",
       });
     }
 
-    // Validate amount
-    if (amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Amount must be greater than 0',
-      });
-    }
-
-    // Create expense
     const expense = await Expense.create({
       description,
       category,
-      type: type || 'expense',
-      amount: parseFloat(amount),
-      date: new Date(date),
+      type: type || "expense",
+      amount,
+      date,
       user,
-      userId: req.user.id,
+      email: email.toLowerCase(),
     });
-
-    // Get updated statistics
-    const stats = await Expense.getStats(req.user.id);
 
     res.status(201).json({
       success: true,
-      message: 'Expense created successfully',
+      message: "Expense created successfully",
       data: expense,
-      stats,
     });
   } catch (error) {
-    console.error('Create expense error:', error);
-
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map((e) => e.message);
-      return res.status(400).json({
-        success: false,
-        message: messages.join(', '),
-      });
-    }
-
     res.status(500).json({
       success: false,
-      message: 'Failed to create expense',
+      message: "Failed to create expense",
       error: error.message,
     });
   }
@@ -165,72 +173,33 @@ exports.createExpense = async (req, res) => {
 // @access  Private
 exports.updateExpense = async (req, res) => {
   try {
-    const { description, category, type, amount, date, user } = req.body;
-
-    // Find expense
-    let expense = await Expense.findOne({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
+    const expense = await Expense.findById(req.params.id);
 
     if (!expense) {
       return res.status(404).json({
         success: false,
-        message: 'Expense not found',
+        message: "Expense not found",
       });
     }
 
-    // Update fields
-    const updateData = {};
-    if (description) updateData.description = description;
-    if (category) updateData.category = category;
-    if (type) updateData.type = type;
-    if (amount) {
-      if (amount <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Amount must be greater than 0',
-        });
-      }
-      updateData.amount = parseFloat(amount);
-    }
-    if (date) updateData.date = new Date(date);
-    if (user) updateData.user = user;
-    updateData.updatedAt = Date.now();
-
-    // Update expense
-    expense = await Expense.findByIdAndUpdate(
+    const updatedExpense = await Expense.findByIdAndUpdate(
       req.params.id,
-      updateData,
+      req.body,
       {
         new: true,
         runValidators: true,
       }
     );
 
-    // Get updated statistics
-    const stats = await Expense.getStats(req.user.id);
-
     res.status(200).json({
       success: true,
-      message: 'Expense updated successfully',
-      data: expense,
-      stats,
+      message: "Expense updated successfully",
+      data: updatedExpense,
     });
   } catch (error) {
-    console.error('Update expense error:', error);
-
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map((e) => e.message);
-      return res.status(400).json({
-        success: false,
-        message: messages.join(', '),
-      });
-    }
-
     res.status(500).json({
       success: false,
-      message: 'Failed to update expense',
+      message: "Failed to update expense",
       error: error.message,
     });
   }
@@ -241,32 +210,24 @@ exports.updateExpense = async (req, res) => {
 // @access  Private
 exports.deleteExpense = async (req, res) => {
   try {
-    const expense = await Expense.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user.id,
-    });
+    const expense = await Expense.findByIdAndDelete(req.params.id);
 
     if (!expense) {
       return res.status(404).json({
         success: false,
-        message: 'Expense not found',
+        message: "Expense not found",
       });
     }
 
-    // Get updated statistics
-    const stats = await Expense.getStats(req.user.id);
-
     res.status(200).json({
       success: true,
-      message: 'Expense deleted successfully',
+      message: "Expense deleted successfully",
       data: expense,
-      stats,
     });
   } catch (error) {
-    console.error('Delete expense error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete expense',
+      message: "Failed to delete expense",
       error: error.message,
     });
   }
