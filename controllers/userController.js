@@ -158,6 +158,27 @@ exports.register = async (req, res) => {
   }
 };
 
+
+exports.logout = async (req, res) => {
+  try {
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully.",
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 /* ===========================================================
    LOGIN USER
 =========================================================== */

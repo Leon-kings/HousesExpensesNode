@@ -13,6 +13,8 @@ const userRoutes = require("./routes/userRoutes");
 const contactRoutes = require("./routes/contactRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const householdRoutes = require("./routes/householdRoutes");
+const expenseRoutes = require('./routes/expenseRoutes');
+
 
 /* ---------------- APP ---------------- */
 const app = express();
@@ -30,9 +32,10 @@ app.use("/api/users", userRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/households", householdRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 /* ---------------- HEALTH CHECK ---------------- */
-app.get("/health", (req, res) => {
+app.get("/health", (req, res) => { 
   res.json({
     status: "OK",
     dbState: mongoose.connection.readyState,
