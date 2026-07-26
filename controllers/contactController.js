@@ -70,6 +70,40 @@ exports.sendMessage = async (req, res) => {
 };
 
 
+// Get Contact Messages By Email
+exports.getContactMessagesByEmail = async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const contacts = await Contact.find({
+      email: email.toLowerCase(),
+    }).sort({
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Contact messages retrieved successfully.",
+      count: contacts.length,
+      data: contacts,
+    });
+  } catch (error) {
+    console.error("Get contact messages by email error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve contact messages.",
+      error: error.message,
+    });
+  }
+};
 
 /* =====================================================
    Get All Messages

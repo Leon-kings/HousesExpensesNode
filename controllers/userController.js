@@ -8,13 +8,9 @@ const nodemailer = require("nodemailer");
 =========================================================== */
 
 const generateToken = (id) => {
-  return jwt.sign(
-    { id },
-    process.env.JWT_SECRET,
-    {
-      expiresIn: "1d",
-    }
-  );
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: "1d",
+  });
 };
 
 /* ===========================================================
@@ -94,21 +90,9 @@ const sendWelcomeEmail = async (user) => {
 
 exports.register = async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      phone,
-      password,
-      confirmPassword,
-    } = req.body;
+    const { name, email, phone, password, confirmPassword } = req.body;
 
-    if (
-      !name ||
-      !email ||
-      !phone ||
-      !password ||
-      !confirmPassword
-    ) {
+    if (!name || !email || !phone || !password || !confirmPassword) {
       return res.status(400).json({
         success: false,
         message: "All fields are required.",
@@ -148,7 +132,6 @@ exports.register = async (req, res) => {
       success: true,
       message: "Account created successfully.",
       token: generateToken(user._id),
-     
     });
   } catch (error) {
     res.status(500).json({
@@ -158,6 +141,41 @@ exports.register = async (req, res) => {
   }
 };
 
+// Get User By Email
+exports.getUserByEmail = async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+    }).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "User retrieved successfully.",
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 exports.logout = async (req, res) => {
   try {
@@ -171,7 +189,6 @@ exports.logout = async (req, res) => {
       success: true,
       message: "Logged out successfully.",
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -185,10 +202,7 @@ exports.logout = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    const {
-      email,
-      password,
-    } = req.body;
+    const { email, password } = req.body;
 
     const user = await User.findOne({
       email,
@@ -201,10 +215,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    const isMatch = await bcrypt.compare(
-      password,
-      user.password
-    );
+    const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return res.status(400).json({
@@ -232,11 +243,9 @@ exports.login = async (req, res) => {
 
 exports.getUsers = async (req, res) => {
   try {
-    const users = await User.find()
-      .select("-password")
-      .sort({
-        createdAt: -1,
-      });
+    const users = await User.find().select("-password").sort({
+      createdAt: -1,
+    });
 
     res.json(users);
   } catch (error) {
@@ -252,8 +261,7 @@ exports.getUsers = async (req, res) => {
 
 exports.getUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
-      .select("-password");
+    const user = await User.findById(req.params.id).select("-password");
 
     if (!user) {
       return res.status(404).json({
@@ -275,12 +283,7 @@ exports.getUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      phone,
-      role,
-    } = req.body;
+    const { name, email, phone, role } = req.body;
 
     const user = await User.findById(req.params.id);
 
