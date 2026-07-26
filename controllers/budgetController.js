@@ -92,6 +92,43 @@ exports.getBudgets = async (req, res) => {
   }
 };
 
+
+
+exports.getBudgetsByEmail = async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const budgets = await Budget.find({
+      email: email.toLowerCase(),
+    }).sort({
+      year: -1,
+      month: -1,
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      success: true,
+      count: budgets.length,
+      data: budgets,
+    });
+  } catch (error) {
+    console.error("Get budgets by email error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve budgets",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Create budget
 // @route   POST /api/budgets
 // @access  Private

@@ -301,6 +301,44 @@ exports.createIncome = async (req, res) => {
   }
 };
 
+
+// Get Incomes By Email
+exports.getIncomesByEmail = async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const incomes = await Income.find({
+      email: email.toLowerCase(),
+    }).sort({
+      date: -1,
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Incomes retrieved successfully",
+      count: incomes.length,
+      data: incomes,
+    });
+  } catch (error) {
+    console.error("Get incomes by email error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve incomes",
+      error: error.message,
+    });
+  }
+};
+
+
 // @desc    Update income
 // @route   PUT /api/incomes/:id
 // @access  Private

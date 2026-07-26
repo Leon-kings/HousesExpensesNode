@@ -135,6 +135,42 @@ exports.createSavings = async (req, res) => {
   }
 };
 
+
+// Get Savings By Email
+exports.getSavingsByEmail = async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const savings = await Savings.find({
+      email: email.toLowerCase(),
+    }).sort({
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Savings goals retrieved successfully",
+      count: savings.length,
+      data: savings,
+    });
+  } catch (error) {
+    console.error("Get savings by email error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve savings goals",
+      error: error.message,
+    });
+  }
+};  
+
 // @desc    Update savings goal
 // @route   PUT /api/savings/:id
 // @access  Private
