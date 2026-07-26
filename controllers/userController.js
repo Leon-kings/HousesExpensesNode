@@ -144,7 +144,7 @@ exports.register = async (req, res) => {
 // Get User By Email
 exports.getUserByEmail = async (req, res) => {
   try {
-    const { email } = req.query;
+    const { email } = req.params;
 
     if (!email) {
       return res.status(400).json({
