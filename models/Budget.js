@@ -199,12 +199,12 @@ BudgetSchema.pre("save", function (next) {
 });
 
 // Recalculate when updating with findOneAndUpdate()
-BudgetSchema.pre("findOneAndUpdate", async function (next) {
+BudgetSchema.pre("findOneAndUpdate", async function () {
   const update = this.getUpdate();
 
   const current = await this.model.findOne(this.getQuery());
 
-  if (!current) return next();
+  if (!current) return;
 
   const allocatedAmount =
     Number(update.allocatedAmount ?? current.allocatedAmount);
@@ -212,29 +212,37 @@ BudgetSchema.pre("findOneAndUpdate", async function (next) {
   const spentAmount =
     Number(update.spentAmount ?? current.spentAmount);
 
+
   update.remainingAmount = Math.max(
     allocatedAmount - spentAmount,
     0
   );
+
 
   update.percentageUsed =
     allocatedAmount > 0
       ? (spentAmount / allocatedAmount) * 100
       : 0;
 
+
   if (update.percentageUsed >= 100) {
     update.status = "over-budget";
+
   } else if (update.percentageUsed >= 80) {
     update.status = "approaching-limit";
-  } else if (update.percentageUsed < 50 && spentAmount > 0) {
+
+  } else if (
+    update.percentageUsed < 50 &&
+    spentAmount > 0
+  ) {
     update.status = "under-budget";
+
   } else {
     update.status = "on-track";
   }
 
-  this.setUpdate(update);
 
-  next();
+  this.setUpdate(update);
 });
 
 module.exports =
