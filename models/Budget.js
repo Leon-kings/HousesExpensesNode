@@ -171,7 +171,8 @@ BudgetSchema.index(
 );
 
 // Automatically calculate values
-BudgetSchema.pre("save", function (next) {
+
+BudgetSchema.pre("save", function () {
   this.allocatedAmount = Number(this.allocatedAmount) || 0;
   this.spentAmount = Number(this.spentAmount) || 0;
 
@@ -185,17 +186,22 @@ BudgetSchema.pre("save", function (next) {
       ? (this.spentAmount / this.allocatedAmount) * 100
       : 0;
 
+
   if (this.percentageUsed >= 100) {
     this.status = "over-budget";
+
   } else if (this.percentageUsed >= 80) {
     this.status = "approaching-limit";
-  } else if (this.percentageUsed < 50 && this.spentAmount > 0) {
+
+  } else if (
+    this.percentageUsed < 50 &&
+    this.spentAmount > 0
+  ) {
     this.status = "under-budget";
+
   } else {
     this.status = "on-track";
   }
-
-  next();
 });
 
 // Recalculate when updating with findOneAndUpdate()
