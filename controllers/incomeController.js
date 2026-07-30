@@ -1,6 +1,6 @@
 const Income = require('../models/Income');
 const Budget = require('../models/Budget');
-const Notification = require('../models/incameNotification');
+const Notification = require('../models/IncomeNotification');
 const mongoose = require('mongoose');
 
 // Helper function to create notification
