@@ -1,5 +1,5 @@
 const Savings = require('../models/Savings');
-const Notification = require('../models/incameNotification');
+const Notification = require('../models/IncomeNotification');
 
 // Helper function to create notification
 const createNotification = async (email, title, message, type, severity = 'medium', relatedId = null, relatedModel = null) => {
