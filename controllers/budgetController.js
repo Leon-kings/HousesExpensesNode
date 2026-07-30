@@ -576,125 +576,165 @@ exports.getBudgetsByEmail = async (req, res) => {
 
 // CREATE BUDGET
 
+// exports.createBudget = async (req, res) => {
+//   try {
+//     let { category, allocatedAmount, month, year, description, email } =
+//       req.body;
+
+//     if (
+//       !category ||
+//       allocatedAmount === undefined ||
+//       month === undefined ||
+//       !year ||
+//       !email
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+
+//         message: "All fields are required",
+//       });
+//     }
+
+//     allocatedAmount = Number(allocatedAmount);
+//     month = Number(month);
+//     year = Number(year);
+
+//     email = email.toLowerCase();
+
+//     const exists = await Budget.findOne({
+//       email,
+
+//       category,
+
+//       month,
+
+//       year,
+//     });
+
+//     if (exists) {
+//       return res.status(400).json({
+//         success: false,
+
+//         message: "Budget already exists",
+//       });
+//     }
+
+//     const incomes = await Income.find({
+//       email,
+
+//       category,
+
+//       date: {
+//         $gte: new Date(year, month, 1),
+
+//         $lt: new Date(year, month + 1, 1),
+//       },
+//     });
+
+//     const spentAmount = incomes.reduce(
+//       (sum, item) => sum + Number(item.amount || 0),
+
+//       0,
+//     );
+
+//     const budget = await Budget.create({
+//       category,
+
+//       allocatedAmount,
+
+//       month,
+
+//       year,
+
+//       description: description || "",
+
+//       email,
+
+//       spentAmount,
+//     });
+
+//     let severity = "low";
+
+//     let message = `You created ${category} budget of $${allocatedAmount.toFixed(2)}`;
+
+//     if (budget.percentageUsed >= 80) {
+//       severity = "medium";
+
+//       message = `${category} budget is ${budget.percentageUsed.toFixed(1)}% used`;
+//     }
+
+//     await createNotification(
+//       email,
+
+//       `📊 Budget Created`,
+
+//       message,
+
+//       "info",
+
+//       severity,
+
+//       budget._id,
+
+//       "Budget",
+//     );
+
+//     res.status(201).json({
+//       success: true,
+
+//       message: "Budget created successfully",
+
+//       data: budget,
+//     });
+//   } catch (error) {
+//     console.error("CREATE BUDGET ERROR:", error.stack);
+
+//     res.status(500).json({
+//       success: false,
+
+//       message: "Failed to create budget",
+
+//       error: error.message,
+//     });
+//   }
+// };
+
 exports.createBudget = async (req, res) => {
   try {
-    let { category, allocatedAmount, month, year, description, email } =
-      req.body;
-
-    if (
-      !category ||
-      allocatedAmount === undefined ||
-      month === undefined ||
-      !year ||
-      !email
-    ) {
-      return res.status(400).json({
-        success: false,
-
-        message: "All fields are required",
-      });
-    }
-
-    allocatedAmount = Number(allocatedAmount);
-    month = Number(month);
-    year = Number(year);
-
-    email = email.toLowerCase();
-
-    const exists = await Budget.findOne({
-      email,
-
+    const {
       category,
-
+      allocatedAmount,
       month,
-
       year,
-    });
+      email
+    } = req.body;
 
-    if (exists) {
+    if (!category || !allocatedAmount || !month || !year || !email) {
       return res.status(400).json({
         success: false,
-
-        message: "Budget already exists",
+        message: "All fields are required"
       });
     }
-
-    const incomes = await Income.find({
-      email,
-
-      category,
-
-      date: {
-        $gte: new Date(year, month, 1),
-
-        $lt: new Date(year, month + 1, 1),
-      },
-    });
-
-    const spentAmount = incomes.reduce(
-      (sum, item) => sum + Number(item.amount || 0),
-
-      0,
-    );
 
     const budget = await Budget.create({
       category,
-
       allocatedAmount,
-
       month,
-
       year,
-
-      description: description || "",
-
-      email,
-
-      spentAmount,
+      email: email.toLowerCase()
     });
-
-    let severity = "low";
-
-    let message = `You created ${category} budget of $${allocatedAmount.toFixed(2)}`;
-
-    if (budget.percentageUsed >= 80) {
-      severity = "medium";
-
-      message = `${category} budget is ${budget.percentageUsed.toFixed(1)}% used`;
-    }
-
-    await createNotification(
-      email,
-
-      `📊 Budget Created`,
-
-      message,
-
-      "info",
-
-      severity,
-
-      budget._id,
-
-      "Budget",
-    );
 
     res.status(201).json({
       success: true,
-
-      message: "Budget created successfully",
-
-      data: budget,
+      budget
     });
+
   } catch (error) {
-    console.error("CREATE BUDGET ERROR:", error.stack);
+    console.error("Create budget error:", error);
 
     res.status(500).json({
       success: false,
-
-      message: "Failed to create budget",
-
-      error: error.message,
+      message: error.message
     });
   }
 };
