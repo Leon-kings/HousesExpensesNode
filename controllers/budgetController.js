@@ -699,6 +699,46 @@ exports.getBudgetsByEmail = async (req, res) => {
 //   }
 // };
 
+// exports.createBudget = async (req, res) => {
+//   try {
+//     const {
+//       category,
+//       allocatedAmount,
+//       month,
+//       year,
+//       email
+//     } = req.body;
+
+//     if (!category || !allocatedAmount || !month || !year || !email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "All fields are required"
+//       });
+//     }
+
+//     const budget = await Budget.create({
+//       category,
+//       allocatedAmount,
+//       month,
+//       year,
+//       email: email.toLowerCase()
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       budget
+//     });
+
+//   } catch (error) {
+//     console.error("Create budget error:", error);
+
+//     res.status(500).json({
+//       success: false,
+//       message: error.message
+//     });
+//   }
+// };
+
 exports.createBudget = async (req, res) => {
   try {
     const {
@@ -706,35 +746,54 @@ exports.createBudget = async (req, res) => {
       allocatedAmount,
       month,
       year,
-      email
+      email,
     } = req.body;
 
-    if (!category || !allocatedAmount || !month || !year || !email) {
+
+    if (
+      !category ||
+      allocatedAmount === undefined ||
+      month === undefined ||
+      year === undefined ||
+      !email
+    ) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required"
+        message: "All fields are required",
       });
     }
 
+
     const budget = await Budget.create({
       category,
-      allocatedAmount,
-      month,
-      year,
-      email: email.toLowerCase()
+      allocatedAmount: Number(allocatedAmount),
+      month: Number(month),
+      year: Number(year),
+      email: email.toLowerCase(),
     });
+
 
     res.status(201).json({
       success: true,
-      budget
+      message: "Budget created successfully",
+      budget,
     });
 
+
   } catch (error) {
-    console.error("Create budget error:", error);
+
+    console.log("==============================");
+    console.log("CREATE BUDGET ERROR");
+    console.log("Error Name:", error.name);
+    console.log("Error Message:", error.message);
+    console.log("Stack Trace:");
+    console.log(error.stack);
+    console.log("==============================");
+
 
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
