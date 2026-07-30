@@ -20,9 +20,7 @@ const createNotification = async (email, title, message, type, severity = 'mediu
   }
 };
 
-// @desc    Get all savings goals
-// @route   GET /api/savings
-// @access  Private
+
 exports.getSavings = async (req, res) => {
   try {
     const { category, isCompleted } = req.query;
@@ -81,9 +79,7 @@ exports.getSavings = async (req, res) => {
   }
 };
 
-// @desc    Create savings goal
-// @route   POST /api/savings
-// @access  Private
+
 exports.createSavings = async (req, res) => {
   try {
     const { category, targetAmount, currentAmount, deadline, description, priority, email } = req.body;
@@ -171,9 +167,7 @@ exports.getSavingsByEmail = async (req, res) => {
   }
 };  
 
-// @desc    Update savings goal
-// @route   PUT /api/savings/:id
-// @access  Private
+
 exports.updateSavings = async (req, res) => {
   try {
     const savings = await Savings.findById(req.params.id);
@@ -249,9 +243,6 @@ exports.updateSavings = async (req, res) => {
   }
 };
 
-// @desc    Delete savings goal
-// @route   DELETE /api/savings/:id
-// @access  Private
 exports.deleteSavings = async (req, res) => {
   try {
     const savings = await Savings.findById(req.params.id);
