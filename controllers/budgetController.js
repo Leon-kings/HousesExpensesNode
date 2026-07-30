@@ -442,7 +442,7 @@
 
 const Budget = require("../models/Budget");
 const Income = require("../models/Income");
-const Notification = require("../models/IncameNotification");
+const Notification = require("../models/IncomeNotification");
 
 // Create notification helper
 const createNotification = async (
