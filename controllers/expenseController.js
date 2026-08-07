@@ -119,6 +119,57 @@ exports.getExpensesByEmail = async (req, res) => {
 // @desc    Create expense
 // @route   POST /api/expenses
 // @access  Private
+// exports.createExpense = async (req, res) => {
+//   try {
+//     const {
+//       description,
+//       category,
+//       type,
+//       amount,
+//       date,
+//       user,
+//       email,
+//     } = req.body;
+
+//     if (
+//       !description ||
+//       !category ||
+//       !amount ||
+//       !date ||
+//       !user ||
+//       !email
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "All fields are required",
+//       });
+//     }
+
+//     const expense = await Expense.create({
+//       description,
+//       category,
+//       type: type || "expense",
+//       amount,
+//       date,
+//       user,
+//       email: email.toLowerCase(),
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Expense created successfully",
+//       data: expense,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to create expense",
+//       error: error.message,
+//     });
+//   }
+// };
+
+
 exports.createExpense = async (req, res) => {
   try {
     const {
@@ -129,43 +180,66 @@ exports.createExpense = async (req, res) => {
       date,
       user,
       email,
+      userId,
     } = req.body;
 
+
+    // Validate required fields
     if (
       !description ||
       !category ||
       !amount ||
       !date ||
       !user ||
-      !email
+      !email ||
+      !userId
     ) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required",
+        message:
+          "Description, category, amount, date, user, email, and userId are required",
       });
     }
 
+
+    // Validate amount
+if (!Number.isInteger(Number(amount)) || Number(amount) <= 0) {
+  return res.status(400).json({
+    success: false,
+    message: "Amount must be a positive whole number (no decimals)",
+  });
+}
+
+
     const expense = await Expense.create({
-      description,
+      description: description.trim(),
       category,
       type: type || "expense",
-      amount,
+      amount: Number(amount),
       date,
-      user,
-      email: email.toLowerCase(),
+      user: user.trim(),
+      userId,
+      email: email.toLowerCase().trim(),
     });
 
-    res.status(201).json({
+
+    return res.status(201).json({
       success: true,
       message: "Expense created successfully",
       data: expense,
     });
+
+
   } catch (error) {
-    res.status(500).json({
+
+    console.error("Create expense error:", error);
+
+    return res.status(500).json({
       success: false,
       message: "Failed to create expense",
       error: error.message,
     });
+
   }
 };
 
