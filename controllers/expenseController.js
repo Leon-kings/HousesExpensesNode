@@ -62,6 +62,36 @@ exports.getExpenses = async (req, res) => {
   }
 };
 
+exports.getAllExpenses = async (req, res) => {
+  try {
+
+    const expenses = await Expense.find({})
+      .sort({
+        date: -1,
+        createdAt: -1,
+      });
+
+
+    res.status(200).json({
+      success: true,
+      count: expenses.length,
+      data: expenses,
+    });
+
+
+  } catch (error) {
+
+    console.error("Get expenses error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch expenses",
+      error: error.message,
+    });
+
+  }
+};
+
 // @desc    Get single expense
 // @route   GET /api/expenses/:id
 // @access  Private
@@ -119,55 +149,6 @@ exports.getExpensesByEmail = async (req, res) => {
 // @desc    Create expense
 // @route   POST /api/expenses
 // @access  Private
-// exports.createExpense = async (req, res) => {
-//   try {
-//     const {
-//       description,
-//       category,
-//       type,
-//       amount,
-//       date,
-//       user,
-//       email,
-//     } = req.body;
-
-//     if (
-//       !description ||
-//       !category ||
-//       !amount ||
-//       !date ||
-//       !user ||
-//       !email
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "All fields are required",
-//       });
-//     }
-
-//     const expense = await Expense.create({
-//       description,
-//       category,
-//       type: type || "expense",
-//       amount,
-//       date,
-//       user,
-//       email: email.toLowerCase(),
-//     });
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Expense created successfully",
-//       data: expense,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to create expense",
-//       error: error.message,
-//     });
-//   }
-// };
 
 
 exports.createExpense = async (req, res) => {

@@ -24,26 +24,24 @@
 
 // module.exports = router;
 
-
-
 const express = require("express");
 const router = express.Router();
 
 const {
-    getExpenses,
-    getExpense,
-    getExpensesByEmail,
-    createExpense,
-    updateExpense,
-    deleteExpense,
-    bulkDeleteExpenses,
-    getStats,
+  getExpenses,
+  getExpense,
+  getExpensesByEmail,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+  bulkDeleteExpenses,
+  getStats,
+  getAllExpenses,
 } = require("../controllers/expenseController");
 
-
-
 // CRUD
-router.get("/", getExpenses);
+router.get("/all", getExpenses);
+router.get("/", getAllExpenses);
 router.get("/stats", getStats);
 router.get("/email/:email", getExpensesByEmail);
 router.get("/:id", getExpense);
