@@ -1,17 +1,72 @@
 const nodemailer = require("nodemailer");
+const os = require("os");
 
 /* ============================================
    Mail Transporter
 ============================================ */
 
+// const transporter = nodemailer.createTransport({
+//   host: process.env.EMAIL_HOST || "smtp.gmail.com",
+//   port: process.env.EMAIL_PORT || 587,
+//   secure: false,
+//   auth: {
+//     user: process.env.EMAIL_USER,
+//     pass: process.env.EMAIL_PASS,
+//   },
+// });
+
+
+
+
+const getServerIP = () => {
+  const interfaces = os.networkInterfaces();
+
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+
+  return "Unknown";
+};
+
+
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST || "smtp.gmail.com",
-  port: process.env.EMAIL_PORT || 587,
+  port: Number(process.env.EMAIL_PORT) || 587,
   secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
+
+  tls: {
+    rejectUnauthorized: false,
+  },
+});
+
+
+transporter.verify((error, success) => {
+
+  console.log("🌍 Server IP:", getServerIP());
+
+  if (error) {
+    console.error(
+      "❌ Email service connection failed:",
+      error.message
+    );
+  } else {
+    console.log(
+      "✅ Email service connected successfully"
+    );
+  }
+
 });
 
 /* ============================================
