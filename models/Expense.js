@@ -1,6 +1,3 @@
-
-
-
 const mongoose = require("mongoose");
 
 const expenseSchema = new mongoose.Schema(
@@ -39,7 +36,11 @@ const expenseSchema = new mongoose.Schema(
     amount: {
       type: Number,
       required: [true, "Amount is required"],
-      min: [0, "Amount cannot be negative"],
+      min: [1, "Amount must be greater than zero"],
+      validate: {
+        validator: Number.isInteger,
+        message: "Amount must be a whole number without decimals",
+      },
     },
     date: {
       type: Date,
@@ -61,7 +62,7 @@ const expenseSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Indexes
@@ -80,9 +81,7 @@ expenseSchema.virtual("formattedAmount").get(function () {
 // Static method to calculate statistics
 expenseSchema.statics.getStats = async function (userId) {
   const objectId =
-    typeof userId === "string"
-      ? new mongoose.Types.ObjectId(userId)
-      : userId;
+    typeof userId === "string" ? new mongoose.Types.ObjectId(userId) : userId;
 
   const result = await this.aggregate([
     {
