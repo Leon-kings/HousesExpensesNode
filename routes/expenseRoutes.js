@@ -41,9 +41,10 @@ const {
 
 // CRUD
 router.get("/all", getExpenses);
+router.get("/email/:email", getExpensesByEmail);
 router.get("/", getAllExpenses);
 router.get("/stats", getStats);
-router.get("/email/:email", getExpensesByEmail);
+
 router.get("/:id", getExpense);
 
 router.post("/", createExpense);
