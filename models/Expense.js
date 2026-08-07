@@ -74,7 +74,7 @@ expenseSchema.index({ userId: 1, type: 1 });
 expenseSchema.virtual("formattedAmount").get(function () {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: "RWF",
   }).format(this.amount);
 });
 

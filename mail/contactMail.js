@@ -5,18 +5,6 @@ const os = require("os");
    Mail Transporter
 ============================================ */
 
-// const transporter = nodemailer.createTransport({
-//   host: process.env.EMAIL_HOST || "smtp.gmail.com",
-//   port: process.env.EMAIL_PORT || 587,
-//   secure: false,
-//   auth: {
-//     user: process.env.EMAIL_USER,
-//     pass: process.env.EMAIL_PASS,
-//   },
-// });
-
-
-
 
 const getServerIP = () => {
   const interfaces = os.networkInterfaces();
@@ -34,21 +22,18 @@ const getServerIP = () => {
 
 
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || "smtp.gmail.com",
-  port: Number(process.env.EMAIL_PORT) || 587,
-  secure: false,
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
 
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
+  family: 4,
 
-  tls: {
-    rejectUnauthorized: false,
-  },
+  connectionTimeout: 20000,
 });
 
 
@@ -75,7 +60,7 @@ transporter.verify((error, success) => {
 
 exports.sendContactReceivedEmail = async (contact) => {
   const mailOptions = {
-    from: process.env.EMAIL_FROM,
+    from: process.env.EMAIL_FROM|| 'housemanager@house.com',
     to: contact.email,
     subject: "We've Received Your Message",
     html: `
@@ -194,7 +179,7 @@ This is an automatic email. Please do not reply.
 
 exports.sendAdminReplyEmail = async (contact) => {
   const mailOptions = {
-    from: process.env.EMAIL_FROM,
+    from: process.env.EMAIL_FROM|| 'housemanager@house.com',
 
     to: contact.email,
 
