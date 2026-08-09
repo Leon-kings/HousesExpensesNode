@@ -1,26 +1,10 @@
-const Income = require('../models/Income');
-const Budget = require('../models/Budget');
-const Notification = require('../models/IncomeNotification');
-const mongoose = require('mongoose');
+const Income = require("../models/Income");
+const Budget = require("../models/Budget");
+const Notification = require("../models/IncomeNotification");
+const mongoose = require("mongoose");
 
 // Helper function to create notification
-const createNotification = async (email, title, message, type, severity = 'medium', relatedId = null, relatedModel = null) => {
-  try {
-    const notification = await Notification.create({
-      email,
-      title,
-      message,
-      type,
-      severity,
-      relatedId,
-      relatedModel,
-    });
-    return notification;
-  } catch (error) {
-    console.error('Failed to create notification:', error);
-    return null;
-  }
-};
+const createNotification = require("../utils/createNotification");
 
 // Helper function to update budget spent amounts
 const updateBudgetSpent = async (email, category, amount, month, year) => {
@@ -34,40 +18,44 @@ const updateBudgetSpent = async (email, category, amount, month, year) => {
 
     if (budget) {
       budget.spentAmount = (budget.spentAmount || 0) + amount;
-      budget.remainingAmount = Math.max(0, budget.allocatedAmount - budget.spentAmount);
-      budget.percentageUsed = budget.allocatedAmount > 0 
-        ? Math.min(100, (budget.spentAmount / budget.allocatedAmount) * 100) 
-        : 0;
-      
+      budget.remainingAmount = Math.max(
+        0,
+        budget.allocatedAmount - budget.spentAmount,
+      );
+      budget.percentageUsed =
+        budget.allocatedAmount > 0
+          ? Math.min(100, (budget.spentAmount / budget.allocatedAmount) * 100)
+          : 0;
+
       // Update status based on percentage
       if (budget.percentageUsed > 100) {
-        budget.status = 'over-budget';
+        budget.status = "over-budget";
         // Create over-budget notification
         await createNotification(
           email,
           `⚠️ Budget Alert: ${category} Over Budget`,
           `You have exceeded your ${category} budget. Spent: $${budget.spentAmount.toFixed(2)} vs Budget: $${budget.allocatedAmount.toFixed(2)}`,
-          'budget_alert',
-          'high',
+          "budget_alert",
+          "high",
           budget._id,
-          'Budget'
+          "Budget",
         );
       } else if (budget.percentageUsed > 80) {
-        budget.status = 'approaching-limit';
+        budget.status = "approaching-limit";
         // Create approaching limit notification
         await createNotification(
           email,
           `⚡ Budget Alert: ${category} Approaching Limit`,
           `You are approaching your ${category} budget limit. Used: ${budget.percentageUsed.toFixed(1)}% ($${budget.spentAmount.toFixed(2)} of $${budget.allocatedAmount.toFixed(2)})`,
-          'budget_alert',
-          'medium',
+          "budget_alert",
+          "medium",
           budget._id,
-          'Budget'
+          "Budget",
         );
       } else if (budget.percentageUsed < 50 && budget.spentAmount > 0) {
-        budget.status = 'under-budget';
+        budget.status = "under-budget";
       } else {
-        budget.status = 'on-track';
+        budget.status = "on-track";
       }
 
       await budget.save();
@@ -75,7 +63,7 @@ const updateBudgetSpent = async (email, category, amount, month, year) => {
     }
     return null;
   } catch (error) {
-    console.error('Update budget spent error:', error);
+    console.error("Update budget spent error:", error);
     return null;
   }
 };
@@ -85,15 +73,8 @@ const updateBudgetSpent = async (email, category, amount, month, year) => {
 // @access  Private
 exports.getIncomes = async (req, res) => {
   try {
-    const {
-      category,
-      source,
-      startDate,
-      endDate,
-      search,
-      month,
-      year,
-    } = req.query;
+    const { category, source, startDate, endDate, search, month, year } =
+      req.query;
 
     // Build query
     const query = {};
@@ -131,9 +112,7 @@ exports.getIncomes = async (req, res) => {
     // Current month/year
     const currentMonth =
       month !== undefined ? parseInt(month) : new Date().getMonth();
-    const currentYear = year
-      ? parseInt(year)
-      : new Date().getFullYear();
+    const currentYear = year ? parseInt(year) : new Date().getFullYear();
 
     // Fetch ALL budgets (no email filter)
     const budgets = await Budget.find({
@@ -144,25 +123,22 @@ exports.getIncomes = async (req, res) => {
     // Calculate monthly income
     const monthIncomes = incomes.filter((inc) => {
       const d = new Date(inc.date);
-      return (
-        d.getMonth() === currentMonth &&
-        d.getFullYear() === currentYear
-      );
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
 
     const totalMonthlyIncome = monthIncomes.reduce(
       (sum, inc) => sum + inc.amount,
-      0
+      0,
     );
 
     const totalBudgeted = budgets.reduce(
       (sum, b) => sum + b.allocatedAmount,
-      0
+      0,
     );
 
     const totalSpent = budgets.reduce(
       (sum, b) => sum + (b.spentAmount || 0),
-      0
+      0,
     );
 
     const remainingBudget = totalBudgeted - totalSpent;
@@ -232,6 +208,75 @@ exports.getIncome = async (req, res) => {
 // @desc    Create income
 // @route   POST /api/incomes
 // @access  Private
+// exports.createIncome = async (req, res) => {
+//   try {
+//     const {
+//       description,
+//       category,
+//       source,
+//       amount,
+//       date,
+//       user,
+//       email,
+//       isRecurring,
+//       frequency,
+//     } = req.body;
+
+//     if (!description || !category || !amount || !date || !user || !email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "All fields are required",
+//       });
+//     }
+
+//     const income = await Income.create({
+//       description,
+//       category,
+//       source: source || category,
+//       amount,
+//       date,
+//       user,
+//       email: email.toLowerCase(),
+//       isRecurring: isRecurring || false,
+//       frequency: frequency || 'monthly',
+//     });
+
+//     // Update budget spent amount
+//     const incomeDate = new Date(date);
+//     await updateBudgetSpent(
+//       email,
+//       category,
+//       amount,
+//       incomeDate.getMonth(),
+//       incomeDate.getFullYear()
+//     );
+
+//     // Create notification for new income
+//     await createNotification(
+//       email,
+//       `💰 Income Recorded: ${description}`,
+//       `You have recorded ${category} income of $${amount.toFixed(2)}.`,
+//       'income_recorded',
+//       'low',
+//       income._id,
+//       'Income'
+//     );
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Income created successfully",
+//       data: income,
+//     });
+//   } catch (error) {
+//     console.error('Create income error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to create income",
+//       error: error.message,
+//     });
+//   }
+// };
+
 exports.createIncome = async (req, res) => {
   try {
     const {
@@ -257,34 +302,24 @@ exports.createIncome = async (req, res) => {
       description,
       category,
       source: source || category,
-      amount,
+      amount: Number(amount),
+      remainingAmount: Number(amount),
       date,
       user,
       email: email.toLowerCase(),
       isRecurring: isRecurring || false,
-      frequency: frequency || 'monthly',
+      frequency: frequency || "monthly",
     });
 
-    // Update budget spent amount
-    const incomeDate = new Date(date);
-    await updateBudgetSpent(
+    // ✅ CORRECT PLACE FOR NOTIFICATION
+    await createNotification({
       email,
-      category,
-      amount,
-      incomeDate.getMonth(),
-      incomeDate.getFullYear()
-    );
-
-    // Create notification for new income
-    await createNotification(
-      email,
-      `💰 Income Recorded: ${description}`,
-      `You have recorded ${category} income of $${amount.toFixed(2)}.`,
-      'income_recorded',
-      'low',
-      income._id,
-      'Income'
-    );
+      title: "💰 Income Added",
+      message: `You received ${amount} from ${source || category}`,
+      type: "info",
+      referenceId: income._id,
+      referenceModel: "Income",
+    });
 
     res.status(201).json({
       success: true,
@@ -292,7 +327,8 @@ exports.createIncome = async (req, res) => {
       data: income,
     });
   } catch (error) {
-    console.error('Create income error:', error);
+    console.error("Create income error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to create income",
@@ -300,7 +336,6 @@ exports.createIncome = async (req, res) => {
     });
   }
 };
-
 
 // Get Incomes By Email
 exports.getIncomesByEmail = async (req, res) => {
@@ -338,7 +373,6 @@ exports.getIncomesByEmail = async (req, res) => {
   }
 };
 
-
 // @desc    Update income
 // @route   PUT /api/incomes/:id
 // @access  Private
@@ -364,18 +398,21 @@ exports.updateIncome = async (req, res) => {
       {
         new: true,
         runValidators: true,
-      }
+      },
     );
 
     // If amount or category changed, update budget
-    if (oldAmount !== updatedIncome.amount || oldCategory !== updatedIncome.category) {
+    if (
+      oldAmount !== updatedIncome.amount ||
+      oldCategory !== updatedIncome.category
+    ) {
       // Remove old amount from old category
       await updateBudgetSpent(
         income.email,
         oldCategory,
         -oldAmount,
         oldDate.getMonth(),
-        oldDate.getFullYear()
+        oldDate.getFullYear(),
       );
 
       // Add new amount to new category
@@ -385,7 +422,7 @@ exports.updateIncome = async (req, res) => {
         updatedIncome.category,
         updatedIncome.amount,
         newDate.getMonth(),
-        newDate.getFullYear()
+        newDate.getFullYear(),
       );
     }
 
@@ -394,10 +431,10 @@ exports.updateIncome = async (req, res) => {
       income.email,
       `📝 Income Updated: ${updatedIncome.description}`,
       `Your ${updatedIncome.category} income has been updated to $${updatedIncome.amount.toFixed(2)}.`,
-      'info',
-      'low',
+      "info",
+      "low",
       updatedIncome._id,
-      'Income'
+      "Income",
     );
 
     res.status(200).json({
@@ -406,7 +443,7 @@ exports.updateIncome = async (req, res) => {
       data: updatedIncome,
     });
   } catch (error) {
-    console.error('Update income error:', error);
+    console.error("Update income error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to update income",
@@ -436,7 +473,7 @@ exports.deleteIncome = async (req, res) => {
       income.category,
       -income.amount,
       incomeDate.getMonth(),
-      incomeDate.getFullYear()
+      incomeDate.getFullYear(),
     );
 
     await Income.findByIdAndDelete(req.params.id);
@@ -446,8 +483,8 @@ exports.deleteIncome = async (req, res) => {
       income.email,
       `🗑️ Income Deleted: ${income.description}`,
       `Your ${income.category} income of $${income.amount.toFixed(2)} has been deleted.`,
-      'warning',
-      'medium'
+      "warning",
+      "medium",
     );
 
     res.status(200).json({
@@ -455,7 +492,7 @@ exports.deleteIncome = async (req, res) => {
       message: "Income deleted successfully",
     });
   } catch (error) {
-    console.error('Delete income error:', error);
+    console.error("Delete income error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to delete income",
@@ -479,7 +516,8 @@ exports.getBudgetSummary = async (req, res) => {
     }
 
     const userEmail = email || req.user.email;
-    const currentMonth = month !== undefined ? parseInt(month) : new Date().getMonth();
+    const currentMonth =
+      month !== undefined ? parseInt(month) : new Date().getMonth();
     const currentYear = year ? parseInt(year) : new Date().getFullYear();
 
     // Get all budgets for the month
@@ -499,15 +537,22 @@ exports.getBudgetSummary = async (req, res) => {
     });
 
     const totalIncome = incomes.reduce((sum, inc) => sum + inc.amount, 0);
-    const totalBudgeted = budgets.reduce((sum, b) => sum + b.allocatedAmount, 0);
-    const totalSpent = budgets.reduce((sum, b) => sum + (b.spentAmount || 0), 0);
+    const totalBudgeted = budgets.reduce(
+      (sum, b) => sum + b.allocatedAmount,
+      0,
+    );
+    const totalSpent = budgets.reduce(
+      (sum, b) => sum + (b.spentAmount || 0),
+      0,
+    );
     const totalRemaining = totalBudgeted - totalSpent;
-    const overallPercentage = totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
+    const overallPercentage =
+      totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
 
     // Category breakdown
-    const categoryBreakdown = budgets.map(budget => {
+    const categoryBreakdown = budgets.map((budget) => {
       const categoryIncome = incomes
-        .filter(inc => inc.category === budget.category)
+        .filter((inc) => inc.category === budget.category)
         .reduce((sum, inc) => sum + inc.amount, 0);
 
       return {
@@ -516,7 +561,7 @@ exports.getBudgetSummary = async (req, res) => {
         spent: budget.spentAmount || 0,
         remaining: budget.remainingAmount || 0,
         percentageUsed: budget.percentageUsed || 0,
-        status: budget.status || 'on-track',
+        status: budget.status || "on-track",
         income: categoryIncome,
       };
     });
@@ -531,14 +576,19 @@ exports.getBudgetSummary = async (req, res) => {
         totalSpent,
         totalRemaining,
         overallPercentage,
-        status: overallPercentage > 100 ? 'over-budget' : 
-                overallPercentage > 80 ? 'approaching-limit' : 
-                overallPercentage < 50 && totalSpent > 0 ? 'under-budget' : 'on-track',
+        status:
+          overallPercentage > 100
+            ? "over-budget"
+            : overallPercentage > 80
+              ? "approaching-limit"
+              : overallPercentage < 50 && totalSpent > 0
+                ? "under-budget"
+                : "on-track",
         categories: categoryBreakdown,
       },
     });
   } catch (error) {
-    console.error('Get budget summary error:', error);
+    console.error("Get budget summary error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch budget summary",
@@ -567,13 +617,19 @@ exports.getIncomeStats = async (req, res) => {
     // Get total income
     const totalIncome = await Income.aggregate([
       { $match: query },
-      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+      { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
     ]);
 
     // Get income by category
     const categoryStats = await Income.aggregate([
       { $match: query },
-      { $group: { _id: '$category', total: { $sum: '$amount' }, count: { $sum: 1 } } },
+      {
+        $group: {
+          _id: "$category",
+          total: { $sum: "$amount" },
+          count: { $sum: 1 },
+        },
+      },
       { $sort: { total: -1 } },
     ]);
 
@@ -591,14 +647,14 @@ exports.getIncomeStats = async (req, res) => {
       {
         $group: {
           _id: {
-            year: { $year: '$date' },
-            month: { $month: '$date' },
+            year: { $year: "$date" },
+            month: { $month: "$date" },
           },
-          total: { $sum: '$amount' },
+          total: { $sum: "$amount" },
           count: { $sum: 1 },
         },
       },
-      { $sort: { '_id.year': -1, '_id.month': -1 } },
+      { $sort: { "_id.year": -1, "_id.month": -1 } },
     ]);
 
     // Get current month budget status
@@ -611,8 +667,14 @@ exports.getIncomeStats = async (req, res) => {
       year: currentYear,
     });
 
-    const totalBudgeted = budgets.reduce((sum, b) => sum + b.allocatedAmount, 0);
-    const totalSpent = budgets.reduce((sum, b) => sum + (b.spentAmount || 0), 0);
+    const totalBudgeted = budgets.reduce(
+      (sum, b) => sum + b.allocatedAmount,
+      0,
+    );
+    const totalSpent = budgets.reduce(
+      (sum, b) => sum + (b.spentAmount || 0),
+      0,
+    );
 
     res.status(200).json({
       success: true,
@@ -627,12 +689,13 @@ exports.getIncomeStats = async (req, res) => {
           totalBudgeted,
           totalSpent,
           remainingBudget: totalBudgeted - totalSpent,
-          percentageUsed: totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0,
+          percentageUsed:
+            totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0,
         },
       },
     });
   } catch (error) {
-    console.error('Get income stats error:', error);
+    console.error("Get income stats error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch income statistics",

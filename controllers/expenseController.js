@@ -1,18 +1,54 @@
-const Expense = require('../models/Expense');
-const mongoose = require('mongoose');
+const Expense = require("../models/Expense");
+const mongoose = require("mongoose");
+
+const createNotification = require("../utils/createNotification");
+
+exports.createExpense = async (req, res) => {
+  try {
+    const { description, category, type, amount, date, user, email, userId } =
+      req.body;
+
+    // validation...
+
+    const expense = await Expense.create({
+      description: description.trim(),
+      category,
+      type: type || "expense",
+      amount: Number(amount),
+      date,
+      user: user.trim(),
+      userId,
+      email: email.toLowerCase().trim(),
+    });
+
+    // ✅ MOVE IT HERE
+    await createNotification({
+      userId,
+      email,
+      title: "💸 Expense Recorded",
+      message: `You spent ${amount} on ${category}`,
+      type: "info",
+      referenceId: expense._id,
+      referenceModel: "Expense",
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Expense created successfully",
+      data: expense,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // @desc    Get all expenses for a user
 // @route   GET /api/expenses
 // @access  Private
 exports.getExpenses = async (req, res) => {
   try {
-    const {
-      category,
-      type,
-      startDate,
-      endDate,
-      search,
-    } = req.query;
+    const { category, type, startDate, endDate, search } = req.query;
 
     const query = {};
 
@@ -64,23 +100,17 @@ exports.getExpenses = async (req, res) => {
 
 exports.getAllExpenses = async (req, res) => {
   try {
-
-    const expenses = await Expense.find({})
-      .sort({
-        date: -1,
-        createdAt: -1,
-      });
-
+    const expenses = await Expense.find({}).sort({
+      date: -1,
+      createdAt: -1,
+    });
 
     res.status(200).json({
       success: true,
       count: expenses.length,
       data: expenses,
     });
-
-
   } catch (error) {
-
     console.error("Get expenses error:", error);
 
     res.status(500).json({
@@ -88,7 +118,6 @@ exports.getAllExpenses = async (req, res) => {
       message: "Failed to fetch expenses",
       error: error.message,
     });
-
   }
 };
 
@@ -118,7 +147,6 @@ exports.getExpense = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Get expenses by user email
 // @route   GET /api/expenses/email/:email
@@ -150,7 +178,6 @@ exports.getExpensesByEmail = async (req, res) => {
 // @route   POST /api/expenses
 // @access  Private
 
-
 // exports.createExpense = async (req, res) => {
 //   try {
 //     const {
@@ -163,7 +190,6 @@ exports.getExpensesByEmail = async (req, res) => {
 //       email,
 //       userId,
 //     } = req.body;
-
 
 //     // Validate required fields
 //     if (
@@ -182,7 +208,6 @@ exports.getExpensesByEmail = async (req, res) => {
 //       });
 //     }
 
-
 //     // Validate amount
 // if (!Number.isInteger(Number(amount)) || Number(amount) <= 0) {
 //   return res.status(400).json({
@@ -190,7 +215,6 @@ exports.getExpensesByEmail = async (req, res) => {
 //     message: "Amount must be a positive whole number (no decimals)",
 //   });
 // }
-
 
 //     const expense = await Expense.create({
 //       description: description.trim(),
@@ -203,13 +227,11 @@ exports.getExpensesByEmail = async (req, res) => {
 //       email: email.toLowerCase().trim(),
 //     });
 
-
 //     return res.status(201).json({
 //       success: true,
 //       message: "Expense created successfully",
 //       data: expense,
 //     });
-
 
 //   } catch (error) {
 
@@ -224,22 +246,12 @@ exports.getExpensesByEmail = async (req, res) => {
 //   }
 // };
 
-
 exports.createExpense = async (req, res) => {
   try {
-    const {
-      description,
-      category,
-      type,
-      amount,
-      date,
-      user,
-      email,
-      userId,
-    } = req.body;
+    const { description, category, type, amount, date, user, email, userId } =
+      req.body;
 
-
-    // Validate required fields
+    // ✅ VALIDATION
     if (
       !description ||
       !category ||
@@ -251,21 +263,18 @@ exports.createExpense = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Description, category, amount, date, user, email, and userId are required",
+        message: "All fields are required",
       });
     }
 
+    if (!Number.isInteger(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Amount must be a positive whole number",
+      });
+    }
 
-    // Validate amount
-if (!Number.isInteger(Number(amount)) || Number(amount) <= 0) {
-  return res.status(400).json({
-    success: false,
-    message: "Amount must be a positive whole number (no decimals)",
-  });
-}
-
-
+    // ✅ CREATE EXPENSE
     const expense = await Expense.create({
       description: description.trim(),
       category,
@@ -277,16 +286,16 @@ if (!Number.isInteger(Number(amount)) || Number(amount) <= 0) {
       email: email.toLowerCase().trim(),
     });
 
+    // ⚠️ NOTE:
+    // Income deduction + savings fallback + notification
+    // are already handled in Expense model (post save hook)
 
     return res.status(201).json({
       success: true,
-      message: "Expense created successfully",
+      message: "Expense created & processed successfully",
       data: expense,
     });
-
-
   } catch (error) {
-
     console.error("Create expense error:", error);
 
     return res.status(500).json({
@@ -294,7 +303,6 @@ if (!Number.isInteger(Number(amount)) || Number(amount) <= 0) {
       message: "Failed to create expense",
       error: error.message,
     });
-
   }
 };
 
@@ -318,7 +326,7 @@ exports.updateExpense = async (req, res) => {
       {
         new: true,
         runValidators: true,
-      }
+      },
     );
 
     res.status(200).json({
@@ -378,24 +386,24 @@ exports.getStats = async (req, res) => {
       {
         $group: {
           _id: {
-            category: '$category',
-            type: '$type',
+            category: "$category",
+            type: "$type",
           },
-          total: { $sum: '$amount' },
+          total: { $sum: "$amount" },
           count: { $sum: 1 },
         },
       },
       {
         $group: {
-          _id: '$_id.category',
+          _id: "$_id.category",
           expenses: {
             $push: {
-              type: '$_id.type',
-              total: '$total',
-              count: '$count',
+              type: "$_id.type",
+              total: "$total",
+              count: "$count",
             },
           },
-          totalAmount: { $sum: '$total' },
+          totalAmount: { $sum: "$total" },
         },
       },
     ]);
@@ -414,32 +422,32 @@ exports.getStats = async (req, res) => {
       {
         $group: {
           _id: {
-            year: { $year: '$date' },
-            month: { $month: '$date' },
-            type: '$type',
+            year: { $year: "$date" },
+            month: { $month: "$date" },
+            type: "$type",
           },
-          total: { $sum: '$amount' },
+          total: { $sum: "$amount" },
         },
       },
       {
         $group: {
           _id: {
-            year: '$_id.year',
-            month: '$_id.month',
+            year: "$_id.year",
+            month: "$_id.month",
           },
           income: {
             $sum: {
-              $cond: [{ $eq: ['$_id.type', 'income'] }, '$total', 0],
+              $cond: [{ $eq: ["$_id.type", "income"] }, "$total", 0],
             },
           },
           expenses: {
             $sum: {
-              $cond: [{ $eq: ['$_id.type', 'expense'] }, '$total', 0],
+              $cond: [{ $eq: ["$_id.type", "expense"] }, "$total", 0],
             },
           },
         },
       },
-      { $sort: { '_id.year': -1, '_id.month': -1 } },
+      { $sort: { "_id.year": -1, "_id.month": -1 } },
       { $limit: 12 },
     ]);
 
@@ -452,10 +460,10 @@ exports.getStats = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get stats error:', error);
+    console.error("Get stats error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch statistics',
+      message: "Failed to fetch statistics",
       error: error.message,
     });
   }
@@ -471,7 +479,7 @@ exports.bulkDeleteExpenses = async (req, res) => {
     if (!expenseIds || !Array.isArray(expenseIds) || expenseIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide an array of expense IDs',
+        message: "Please provide an array of expense IDs",
       });
     }
 
@@ -490,10 +498,10 @@ exports.bulkDeleteExpenses = async (req, res) => {
       stats,
     });
   } catch (error) {
-    console.error('Bulk delete error:', error);
+    console.error("Bulk delete error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete expenses',
+      message: "Failed to delete expenses",
       error: error.message,
     });
   }

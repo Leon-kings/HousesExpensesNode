@@ -1,28 +1,35 @@
 const Notification = require("../models/Notification");
 
-const createNotification = async (
-  userEmail,
-  title,
+/**
+ * Universal notification creator
+ */
+const createNotification = async ({
+  userId = null,
+  email = null,
+  title = "",
   message,
-  type = "system",
-  severity = "low",
-  relatedId = null,
-  relatedType = "system"
-) => {
+  type = "info", // info | warning | alert
+  referenceId = null,
+  referenceModel = null,
+}) => {
   try {
+    if (!message) {
+      throw new Error("Notification message is required");
+    }
+
     const notification = await Notification.create({
-      userEmail,
+      userId,
+      email,
       title,
       message,
       type,
-      severity,
-      relatedId,
-      relatedType: relatedType.toLowerCase(),
+      referenceId,
+      referenceModel,
     });
 
     return notification;
   } catch (error) {
-    console.error("Notification Error:", error);
+    console.error("Notification error:", error.message);
     return null;
   }
 };
