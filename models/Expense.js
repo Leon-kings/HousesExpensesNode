@@ -308,6 +308,197 @@
 
 
 
+// // ============================================================
+// // MODELS / EXPENSE.JS
+// // ============================================================
+
+// const mongoose = require("mongoose");
+
+// const expenseSchema = new mongoose.Schema(
+//   {
+//     // ----------------------------------------------------------
+//     // DESCRIPTION
+//     // ----------------------------------------------------------
+
+//     description: {
+//       type: String,
+//       required: [true, "Description is required"],
+//       trim: true,
+//       maxlength: [
+//         200,
+//         "Description cannot exceed 200 characters",
+//       ],
+//     },
+
+//     // ----------------------------------------------------------
+//     // CATEGORY
+//     // ----------------------------------------------------------
+
+//     category: {
+//       type: String,
+//       required: [true, "Category is required"],
+//       trim: true,
+//       enum: [
+//         "Food",
+//         "Utilities",
+//         "Transport",
+//         "Entertainment",
+//         "Shopping",
+//         "Healthcare",
+//         "Education",
+//         "Salary",
+//         "Freelance",
+//         "Investment",
+//         "Rent",
+//         "Insurance",
+//         "Other",
+//       ],
+//     },
+
+//     // ----------------------------------------------------------
+//     // TYPE
+//     // ----------------------------------------------------------
+
+//     type: {
+//       type: String,
+//       enum: ["expense", "income"],
+//       default: "expense",
+//     },
+
+//     // ----------------------------------------------------------
+//     // AMOUNT
+//     // ----------------------------------------------------------
+
+//     amount: {
+//       type: Number,
+//       required: [true, "Amount is required"],
+//       min: [1, "Amount must be greater than zero"],
+//       validate: {
+//         validator: (value) =>
+//           Number.isFinite(value) && Number.isInteger(value),
+//         message: "Amount must be a positive whole number",
+//       },
+//     },
+
+//     // ----------------------------------------------------------
+//     // DATE
+//     // ----------------------------------------------------------
+
+//     date: {
+//       type: Date,
+//       default: Date.now,
+//     },
+
+//     // ----------------------------------------------------------
+//     // USER DISPLAY NAME
+//     // ----------------------------------------------------------
+
+//     user: {
+//       type: String,
+//       required: [true, "User is required"],
+//       trim: true,
+//       maxlength: [
+//         100,
+//         "User cannot exceed 100 characters",
+//       ],
+//     },
+
+//     // ----------------------------------------------------------
+//     // PRIMARY USER OWNERSHIP
+//     // ----------------------------------------------------------
+
+//     userId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "User",
+//       required: [true, "User ID is required"],
+//       index: true,
+//     },
+
+//     // ----------------------------------------------------------
+//     // EMAIL
+//     //
+//     // Kept because your existing controllers use email.
+//     // ----------------------------------------------------------
+
+//     email: {
+//       type: String,
+//       required: [true, "Email is required"],
+//       trim: true,
+//       lowercase: true,
+//       index: true,
+//     },
+//   },
+//   {
+//     timestamps: true,
+//   }
+// );
+
+// // ============================================================
+// // NORMALIZE BEFORE SAVE
+// // ============================================================
+
+// expenseSchema.pre("save", function () {
+//   this.description = String(this.description || "").trim();
+
+//   this.user = String(this.user || "").trim();
+
+//   this.email = String(this.email || "")
+//     .trim()
+//     .toLowerCase();
+
+//   // Keep the amount safe.
+//   this.amount = Number(this.amount);
+
+//   // Normalize expense type.
+//   this.type = this.type || "expense";
+// });
+
+// // ============================================================
+// // INDEXES
+// // ============================================================
+
+// expenseSchema.index({
+//   userId: 1,
+//   date: -1,
+// });
+
+// expenseSchema.index({
+//   userId: 1,
+//   category: 1,
+// });
+
+// expenseSchema.index({
+//   email: 1,
+//   date: -1,
+// });
+
+// expenseSchema.index({
+//   email: 1,
+//   category: 1,
+// });
+
+// // ============================================================
+// // MODEL
+// // ============================================================
+
+// module.exports =
+//   mongoose.models.Expense ||
+//   mongoose.model("Expense", expenseSchema);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ============================================================
 // MODELS / EXPENSE.JS
 // ============================================================
@@ -332,27 +523,34 @@ const expenseSchema = new mongoose.Schema(
 
     // ----------------------------------------------------------
     // CATEGORY
+    //
+    // IMPORTANT:
+    // Keep these capitalized because your createExpense
+    // controller validates the same values.
     // ----------------------------------------------------------
 
     category: {
       type: String,
       required: [true, "Category is required"],
       trim: true,
-      enum: [
-        "Food",
-        "Utilities",
-        "Transport",
-        "Entertainment",
-        "Shopping",
-        "Healthcare",
-        "Education",
-        "Salary",
-        "Freelance",
-        "Investment",
-        "Rent",
-        "Insurance",
-        "Other",
-      ],
+      enum: {
+        values: [
+          "Food",
+          "Utilities",
+          "Transport",
+          "Entertainment",
+          "Shopping",
+          "Healthcare",
+          "Education",
+          "Salary",
+          "Freelance",
+          "Investment",
+          "Rent",
+          "Insurance",
+          "Other",
+        ],
+        message: "Invalid expense category",
+      },
     },
 
     // ----------------------------------------------------------
@@ -361,7 +559,10 @@ const expenseSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["expense", "income"],
+      enum: {
+        values: ["expense", "income"],
+        message: "Type must be either expense or income",
+      },
       default: "expense",
     },
 
@@ -375,8 +576,11 @@ const expenseSchema = new mongoose.Schema(
       min: [1, "Amount must be greater than zero"],
       validate: {
         validator: (value) =>
-          Number.isFinite(value) && Number.isInteger(value),
-        message: "Amount must be a positive whole number",
+          Number.isFinite(value) &&
+          Number.isInteger(value) &&
+          value > 0,
+        message:
+          "Amount must be a positive whole number",
       },
     },
 
@@ -386,6 +590,7 @@ const expenseSchema = new mongoose.Schema(
 
     date: {
       type: Date,
+      required: [true, "Date is required"],
       default: Date.now,
     },
 
@@ -417,7 +622,8 @@ const expenseSchema = new mongoose.Schema(
     // ----------------------------------------------------------
     // EMAIL
     //
-    // Kept because your existing controllers use email.
+    // Kept for compatibility with existing controllers,
+    // notifications, and frontend code.
     // ----------------------------------------------------------
 
     email: {
@@ -426,6 +632,136 @@ const expenseSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
       index: true,
+    },
+
+    // ----------------------------------------------------------
+    // MONEY USED FROM INCOME
+    // ----------------------------------------------------------
+
+    incomeUsed: {
+      type: Number,
+      default: 0,
+      min: [
+        0,
+        "Income used cannot be negative",
+      ],
+      validate: {
+        validator: (value) =>
+          Number.isFinite(value) &&
+          Number.isInteger(value),
+        message:
+          "Income used must be a valid whole number",
+      },
+    },
+
+    // ----------------------------------------------------------
+    // MONEY USED FROM SAVINGS
+    // ----------------------------------------------------------
+
+    savingsUsed: {
+      type: Number,
+      default: 0,
+      min: [
+        0,
+        "Savings used cannot be negative",
+      ],
+      validate: {
+        validator: (value) =>
+          Number.isFinite(value) &&
+          Number.isInteger(value),
+        message:
+          "Savings used must be a valid whole number",
+      },
+    },
+
+    // ----------------------------------------------------------
+    // SAVINGS ALLOCATIONS
+    //
+    // Records exactly which savings accounts were used
+    // to fund this expense.
+    // ----------------------------------------------------------
+
+    // savingsAllocations: [
+    //   {
+    //     savingsId: {
+    //       type: mongoose.Schema.Types.ObjectId,
+    //       ref: "Savings",
+    //       required: true,
+    //     },
+
+    //     amount: {
+    //       type: Number,
+    //       required: true,
+    //       min: [
+    //         1,
+    //         "Savings allocation must be greater than zero",
+    //       ],
+    //       validate: {
+    //         validator: (value) =>
+    //           Number.isFinite(value) &&
+    //           Number.isInteger(value),
+    //         message:
+    //           "Savings allocation must be a valid whole number",
+    //       },
+    //     },
+    //   },
+    // ],
+
+    savingsAllocations: {
+  type: [
+    {
+      savingsId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Savings",
+        required: true,
+      },
+
+      amount: {
+        type: Number,
+        required: true,
+        min: [1, "Savings allocation must be greater than zero"],
+        validate: {
+          validator: (value) =>
+            Number.isFinite(value) &&
+            Number.isInteger(value),
+          message:
+            "Savings allocation must be a valid whole number",
+        },
+      },
+    },
+  ],
+  default: [],
+},
+
+    // ----------------------------------------------------------
+    // BUDGET REFERENCE
+    // ----------------------------------------------------------
+
+    budgetId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Budget",
+      default: null,
+      index: true,
+    },
+
+    // ----------------------------------------------------------
+    // AMOUNT APPLIED TO BUDGET
+    // ----------------------------------------------------------
+
+    budgetAmountUsed: {
+      type: Number,
+      default: 0,
+      min: [
+        0,
+        "Budget amount used cannot be negative",
+      ],
+      validate: {
+        validator: (value) =>
+          Number.isFinite(value) &&
+          Number.isInteger(value),
+        message:
+          "Budget amount used must be a valid whole number",
+      },
     },
   },
   {
@@ -438,43 +774,130 @@ const expenseSchema = new mongoose.Schema(
 // ============================================================
 
 expenseSchema.pre("save", function () {
-  this.description = String(this.description || "").trim();
+  // ----------------------------------------------------------
+  // DESCRIPTION
+  // ----------------------------------------------------------
 
-  this.user = String(this.user || "").trim();
+  this.description = String(
+    this.description || ""
+  ).trim();
 
-  this.email = String(this.email || "")
+  // ----------------------------------------------------------
+  // USER
+  // ----------------------------------------------------------
+
+  this.user = String(
+    this.user || ""
+  ).trim();
+
+  // ----------------------------------------------------------
+  // EMAIL
+  // ----------------------------------------------------------
+
+  this.email = String(
+    this.email || ""
+  )
     .trim()
     .toLowerCase();
 
-  // Keep the amount safe.
-  this.amount = Number(this.amount);
+  // ----------------------------------------------------------
+  // TYPE
+  // ----------------------------------------------------------
 
-  // Normalize expense type.
   this.type = this.type || "expense";
+
+  // ----------------------------------------------------------
+  // AMOUNT
+  // ----------------------------------------------------------
+
+  const numericAmount = Number(this.amount);
+
+  if (
+    !Number.isFinite(numericAmount) ||
+    !Number.isInteger(numericAmount) ||
+    numericAmount <= 0
+  ) {
+    throw new Error(
+      "Amount must be a positive whole number"
+    );
+  }
+
+  this.amount = numericAmount;
+
+  // ----------------------------------------------------------
+  // INCOME USED
+  // ----------------------------------------------------------
+
+  const numericIncomeUsed =
+    Number(this.incomeUsed) || 0;
+
+  this.incomeUsed = Math.max(
+    0,
+    Math.trunc(numericIncomeUsed)
+  );
+
+  // ----------------------------------------------------------
+  // SAVINGS USED
+  // ----------------------------------------------------------
+
+  const numericSavingsUsed =
+    Number(this.savingsUsed) || 0;
+
+  this.savingsUsed = Math.max(
+    0,
+    Math.trunc(numericSavingsUsed)
+  );
+
+  // ----------------------------------------------------------
+  // BUDGET AMOUNT USED
+  // ----------------------------------------------------------
+
+  const numericBudgetAmount =
+    Number(this.budgetAmountUsed) || 0;
+
+  this.budgetAmountUsed = Math.max(
+    0,
+    Math.trunc(numericBudgetAmount)
+  );
 });
 
 // ============================================================
 // INDEXES
 // ============================================================
 
+// User expenses ordered by newest date.
+
 expenseSchema.index({
   userId: 1,
   date: -1,
 });
+
+// User expenses by category.
 
 expenseSchema.index({
   userId: 1,
   category: 1,
 });
 
+// Email-based compatibility query.
+
 expenseSchema.index({
   email: 1,
   date: -1,
 });
 
+// Email + category query.
+
 expenseSchema.index({
   email: 1,
   category: 1,
+});
+
+// Budget-related expense lookup.
+
+expenseSchema.index({
+  userId: 1,
+  budgetId: 1,
 });
 
 // ============================================================
@@ -484,5 +907,4 @@ expenseSchema.index({
 module.exports =
   mongoose.models.Expense ||
   mongoose.model("Expense", expenseSchema);
-
 
