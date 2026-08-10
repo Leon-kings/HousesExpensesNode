@@ -152,6 +152,258 @@
 
 
 
+// // ============================================================
+// // MODELS / BUDGET.JS
+// // ============================================================
+
+// const mongoose = require("mongoose");
+
+// const BudgetSchema = new mongoose.Schema(
+//   {
+//     category: {
+//       type: String,
+//       required: [true, "Category is required"],
+//       trim: true,
+//       lowercase: true,
+//     },
+
+//     allocatedAmount: {
+//       type: Number,
+//       required: [true, "Allocated amount is required"],
+//       min: [0, "Allocated amount cannot be negative"],
+//     },
+
+//     spentAmount: {
+//       type: Number,
+//       default: 0,
+//       min: 0,
+//     },
+
+//     remainingAmount: {
+//       type: Number,
+//       default: 0,
+//       min: 0,
+//     },
+
+//     percentageUsed: {
+//       type: Number,
+//       default: 0,
+//       min: 0,
+//     },
+
+//     status: {
+//       type: String,
+//       enum: [
+//         "on-track",
+//         "approaching-limit",
+//         "over-budget",
+//         "under-budget",
+//       ],
+//       default: "on-track",
+//     },
+
+//     month: {
+//       type: Number,
+//       required: [true, "Month is required"],
+//       min: 0,
+//       max: 11,
+//     },
+
+//     year: {
+//       type: Number,
+//       required: [true, "Year is required"],
+//     },
+
+//     description: {
+//       type: String,
+//       trim: true,
+//       default: "",
+//     },
+
+//     email: {
+//       type: String,
+//       required: [true, "Email is required"],
+//       trim: true,
+//       lowercase: true,
+//     },
+//   },
+//   {
+//     timestamps: true,
+//   }
+// );
+
+// // ============================================================
+// // ONE BUDGET PER CATEGORY / MONTH / YEAR / USER
+// // ============================================================
+
+// BudgetSchema.index(
+//   {
+//     email: 1,
+//     category: 1,
+//     month: 1,
+//     year: 1,
+//   },
+//   {
+//     unique: true,
+//   }
+// );
+
+// // ============================================================
+// // AUTOMATICALLY CALCULATE BUDGET VALUES
+// // ============================================================
+
+// BudgetSchema.pre("save", function (next) {
+//   this.category = String(this.category || "")
+//     .trim()
+//     .toLowerCase();
+
+//   this.email = String(this.email || "")
+//     .trim()
+//     .toLowerCase();
+
+//   this.allocatedAmount =
+//     Number(this.allocatedAmount) || 0;
+
+//   this.spentAmount =
+//     Number(this.spentAmount) || 0;
+
+//   // ==========================================================
+//   // REMAINING
+//   // ==========================================================
+
+//   this.remainingAmount = Math.max(
+//     this.allocatedAmount - this.spentAmount,
+//     0
+//   );
+
+//   // ==========================================================
+//   // PERCENTAGE
+//   // ==========================================================
+
+//   this.percentageUsed =
+//     this.allocatedAmount > 0
+//       ? (this.spentAmount /
+//           this.allocatedAmount) *
+//         100
+//       : 0;
+
+//   // ==========================================================
+//   // STATUS
+//   // ==========================================================
+
+//   if (this.percentageUsed >= 100) {
+//     this.status = "over-budget";
+//   } else if (this.percentageUsed >= 80) {
+//     this.status = "approaching-limit";
+//   } else if (
+//     this.percentageUsed < 50 &&
+//     this.spentAmount > 0
+//   ) {
+//     this.status = "under-budget";
+//   } else {
+//     this.status = "on-track";
+//   }
+
+//   next();
+// });
+
+// // ============================================================
+// // RECALCULATE FINDONEANDUPDATE
+// // ============================================================
+
+// BudgetSchema.pre(
+//   "findOneAndUpdate",
+//   async function (next) {
+//     try {
+//       const update = this.getUpdate() || {};
+
+//       const current =
+//         await this.model.findOne(
+//           this.getQuery()
+//         );
+
+//       if (!current) {
+//         return next();
+//       }
+
+//       const allocatedAmount =
+//         Number(
+//           update.allocatedAmount ??
+//             current.allocatedAmount
+//         ) || 0;
+
+//       const spentAmount =
+//         Number(
+//           update.spentAmount ??
+//             current.spentAmount
+//         ) || 0;
+
+//       update.remainingAmount =
+//         Math.max(
+//           allocatedAmount -
+//             spentAmount,
+//           0
+//         );
+
+//       update.percentageUsed =
+//         allocatedAmount > 0
+//           ? (spentAmount /
+//               allocatedAmount) *
+//             100
+//           : 0;
+
+//       if (
+//         update.percentageUsed >=
+//         100
+//       ) {
+//         update.status =
+//           "over-budget";
+//       } else if (
+//         update.percentageUsed >=
+//         80
+//       ) {
+//         update.status =
+//           "approaching-limit";
+//       } else if (
+//         update.percentageUsed < 50 &&
+//         spentAmount > 0
+//       ) {
+//         update.status =
+//           "under-budget";
+//       } else {
+//         update.status =
+//           "on-track";
+//       }
+
+//       this.setUpdate(update);
+
+//       next();
+//     } catch (error) {
+//       next(error);
+//     }
+//   }
+// );
+
+// module.exports =
+//   mongoose.models.Budget ||
+//   mongoose.model(
+//     "Budget",
+//     BudgetSchema
+//   );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ============================================================
 // MODELS / BUDGET.JS
 // ============================================================
@@ -160,6 +412,10 @@ const mongoose = require("mongoose");
 
 const BudgetSchema = new mongoose.Schema(
   {
+    // ==========================================================
+    // CATEGORY
+    // ==========================================================
+
     category: {
       type: String,
       required: [true, "Category is required"],
@@ -167,11 +423,19 @@ const BudgetSchema = new mongoose.Schema(
       lowercase: true,
     },
 
+    // ==========================================================
+    // ALLOCATED AMOUNT
+    // ==========================================================
+
     allocatedAmount: {
       type: Number,
       required: [true, "Allocated amount is required"],
       min: [0, "Allocated amount cannot be negative"],
     },
+
+    // ==========================================================
+    // SPENT AMOUNT
+    // ==========================================================
 
     spentAmount: {
       type: Number,
@@ -179,17 +443,29 @@ const BudgetSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // ==========================================================
+    // REMAINING AMOUNT
+    // ==========================================================
+
     remainingAmount: {
       type: Number,
       default: 0,
       min: 0,
     },
 
+    // ==========================================================
+    // PERCENTAGE USED
+    // ==========================================================
+
     percentageUsed: {
       type: Number,
       default: 0,
       min: 0,
     },
+
+    // ==========================================================
+    // STATUS
+    // ==========================================================
 
     status: {
       type: String,
@@ -202,6 +478,10 @@ const BudgetSchema = new mongoose.Schema(
       default: "on-track",
     },
 
+    // ==========================================================
+    // MONTH
+    // ==========================================================
+
     month: {
       type: Number,
       required: [true, "Month is required"],
@@ -209,16 +489,28 @@ const BudgetSchema = new mongoose.Schema(
       max: 11,
     },
 
+    // ==========================================================
+    // YEAR
+    // ==========================================================
+
     year: {
       type: Number,
       required: [true, "Year is required"],
     },
+
+    // ==========================================================
+    // DESCRIPTION
+    // ==========================================================
 
     description: {
       type: String,
       trim: true,
       default: "",
     },
+
+    // ==========================================================
+    // USER EMAIL
+    // ==========================================================
 
     email: {
       type: String,
@@ -252,14 +544,26 @@ BudgetSchema.index(
 // AUTOMATICALLY CALCULATE BUDGET VALUES
 // ============================================================
 
-BudgetSchema.pre("save", function (next) {
+BudgetSchema.pre("save", function () {
+  // ==========================================================
+  // NORMALIZE CATEGORY
+  // ==========================================================
+
   this.category = String(this.category || "")
     .trim()
     .toLowerCase();
 
+  // ==========================================================
+  // NORMALIZE EMAIL
+  // ==========================================================
+
   this.email = String(this.email || "")
     .trim()
     .toLowerCase();
+
+  // ==========================================================
+  // NORMALIZE NUMBERS
+  // ==========================================================
 
   this.allocatedAmount =
     Number(this.allocatedAmount) || 0;
@@ -268,16 +572,17 @@ BudgetSchema.pre("save", function (next) {
     Number(this.spentAmount) || 0;
 
   // ==========================================================
-  // REMAINING
+  // REMAINING AMOUNT
   // ==========================================================
 
   this.remainingAmount = Math.max(
-    this.allocatedAmount - this.spentAmount,
+    this.allocatedAmount -
+      this.spentAmount,
     0
   );
 
   // ==========================================================
-  // PERCENTAGE
+  // PERCENTAGE USED
   // ==========================================================
 
   this.percentageUsed =
@@ -303,8 +608,6 @@ BudgetSchema.pre("save", function (next) {
   } else {
     this.status = "on-track";
   }
-
-  next();
 });
 
 // ============================================================
@@ -313,76 +616,111 @@ BudgetSchema.pre("save", function (next) {
 
 BudgetSchema.pre(
   "findOneAndUpdate",
-  async function (next) {
-    try {
-      const update = this.getUpdate() || {};
+  async function () {
+    const update = this.getUpdate() || {};
 
-      const current =
-        await this.model.findOne(
-          this.getQuery()
-        );
+    const current =
+      await this.model.findOne(
+        this.getQuery()
+      );
 
-      if (!current) {
-        return next();
-      }
+    if (!current) {
+      return;
+    }
 
-      const allocatedAmount =
-        Number(
-          update.allocatedAmount ??
-            current.allocatedAmount
-        ) || 0;
+    // ========================================================
+    // HANDLE $SET
+    // ========================================================
 
-      const spentAmount =
-        Number(
-          update.spentAmount ??
-            current.spentAmount
-        ) || 0;
+    const setUpdate = update.$set || update;
 
+    // ========================================================
+    // ALLOCATED
+    // ========================================================
+
+    const allocatedAmount =
+      Number(
+        setUpdate.allocatedAmount ??
+          current.allocatedAmount
+      ) || 0;
+
+    // ========================================================
+    // SPENT
+    // ========================================================
+
+    const spentAmount =
+      Number(
+        setUpdate.spentAmount ??
+          current.spentAmount
+      ) || 0;
+
+    // ========================================================
+    // REMAINING
+    // ========================================================
+
+    const remainingAmount = Math.max(
+      allocatedAmount -
+        spentAmount,
+      0
+    );
+
+    // ========================================================
+    // PERCENTAGE
+    // ========================================================
+
+    const percentageUsed =
+      allocatedAmount > 0
+        ? (spentAmount /
+            allocatedAmount) *
+          100
+        : 0;
+
+    // ========================================================
+    // STATUS
+    // ========================================================
+
+    let status = "on-track";
+
+    if (percentageUsed >= 100) {
+      status = "over-budget";
+    } else if (percentageUsed >= 80) {
+      status = "approaching-limit";
+    } else if (
+      percentageUsed < 50 &&
+      spentAmount > 0
+    ) {
+      status = "under-budget";
+    }
+
+    // ========================================================
+    // UPDATE VALUES
+    // ========================================================
+
+    if (update.$set) {
+      update.$set.remainingAmount =
+        remainingAmount;
+
+      update.$set.percentageUsed =
+        percentageUsed;
+
+      update.$set.status = status;
+    } else {
       update.remainingAmount =
-        Math.max(
-          allocatedAmount -
-            spentAmount,
-          0
-        );
+        remainingAmount;
 
       update.percentageUsed =
-        allocatedAmount > 0
-          ? (spentAmount /
-              allocatedAmount) *
-            100
-          : 0;
+        percentageUsed;
 
-      if (
-        update.percentageUsed >=
-        100
-      ) {
-        update.status =
-          "over-budget";
-      } else if (
-        update.percentageUsed >=
-        80
-      ) {
-        update.status =
-          "approaching-limit";
-      } else if (
-        update.percentageUsed < 50 &&
-        spentAmount > 0
-      ) {
-        update.status =
-          "under-budget";
-      } else {
-        update.status =
-          "on-track";
-      }
-
-      this.setUpdate(update);
-
-      next();
-    } catch (error) {
-      next(error);
+      update.status = status;
     }
+
+    this.setUpdate(update);
   }
 );
+
+// ============================================================
+// EXPORT MODEL
+// ============================================================
 
 module.exports =
   mongoose.models.Budget ||
