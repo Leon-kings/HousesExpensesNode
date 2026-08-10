@@ -22,6 +22,26 @@ exports.getNotifications = async (req, res) => {
   }
 };
 
+exports.getAllNotifications = async (req, res) => {
+  try {
+    const notifications = await Notification.find({}).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: notifications.length,
+      notifications,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching notifications:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch notifications",
+      error: error.message,
+    });
+  }
+};
+
 /* ===========================================
                Get Notification By ID
             =========================================== */

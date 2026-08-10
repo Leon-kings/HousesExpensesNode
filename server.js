@@ -18,7 +18,7 @@ const expenseRoutes = require('./routes/expenseRoutes');
 const incomeRoutes = require('./routes/incomeRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
 const savingsRoutes = require('./routes/savingsRoutes');
-const incameNotificationRoutes = require('./routes/incameNotificationRoutes');
+
 
 
 /* ---------------- APP ---------------- */
@@ -42,7 +42,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/incomes', incomeRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/savings', savingsRoutes);
-app.use('/api/notifications', incameNotificationRoutes);
+
 
 /* ---------------- HEALTH CHECK ---------------- */
 app.get("/health", (req, res) => { 
