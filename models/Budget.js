@@ -1397,6 +1397,270 @@
 
 
 
+// // ============================================================
+// // MODELS / BUDGET.JS
+// // ============================================================
+
+// const mongoose = require("mongoose");
+
+// const BudgetSchema = new mongoose.Schema(
+//   {
+//     // ----------------------------------------------------------
+//     // CATEGORY
+//     // ----------------------------------------------------------
+
+//     category: {
+//       type: String,
+//       required: [true, "Category is required"],
+//       trim: true,
+//       lowercase: true,
+//       maxlength: [100, "Category cannot exceed 100 characters"],
+//     },
+
+//     // ----------------------------------------------------------
+//     // BUDGET AMOUNT
+//     // ----------------------------------------------------------
+
+//     allocatedAmount: {
+//       type: Number,
+//       required: [true, "Allocated amount is required"],
+//       min: [0, "Allocated amount cannot be negative"],
+//       validate: {
+//         validator: Number.isFinite,
+//         message: "Allocated amount must be a valid number",
+//       },
+//     },
+
+//     // ----------------------------------------------------------
+//     // AMOUNT ALREADY SPENT
+//     // ----------------------------------------------------------
+
+//     spentAmount: {
+//       type: Number,
+//       default: 0,
+//       min: [0, "Spent amount cannot be negative"],
+//       validate: {
+//         validator: Number.isFinite,
+//         message: "Spent amount must be a valid number",
+//       },
+//     },
+
+//     // ----------------------------------------------------------
+//     // REMAINING BUDGET
+//     // ----------------------------------------------------------
+
+//     remainingAmount: {
+//       type: Number,
+//       default: 0,
+//       min: [0, "Remaining amount cannot be negative"],
+//     },
+
+//     // ----------------------------------------------------------
+//     // PERCENTAGE USED
+//     // ----------------------------------------------------------
+
+//     percentageUsed: {
+//       type: Number,
+//       default: 0,
+//       min: 0,
+//     },
+
+//     // ----------------------------------------------------------
+//     // STATUS
+//     // ----------------------------------------------------------
+
+//     status: {
+//       type: String,
+//       enum: [
+//         "on-track",
+//         "approaching-limit",
+//         "over-budget",
+//         "under-budget",
+//       ],
+//       default: "on-track",
+//     },
+
+//     // ----------------------------------------------------------
+//     // MONTH
+//     //
+//     // JavaScript:
+//     // January = 0
+//     // December = 11
+//     // ----------------------------------------------------------
+
+//     month: {
+//       type: Number,
+//       required: [true, "Month is required"],
+//       min: [0, "Month must be between 0 and 11"],
+//       max: [11, "Month must be between 0 and 11"],
+//     },
+
+//     year: {
+//       type: Number,
+//       required: [true, "Year is required"],
+//       min: [2000, "Invalid year"],
+//     },
+
+//     description: {
+//       type: String,
+//       trim: true,
+//       maxlength: [300, "Description cannot exceed 300 characters"],
+//       default: "",
+//     },
+
+//     // ----------------------------------------------------------
+//     // USER EMAIL
+//     // ----------------------------------------------------------
+
+//     email: {
+//       type: String,
+//       required: [true, "Email is required"],
+//       trim: true,
+//       lowercase: true,
+//       index: true,
+//     },
+
+//     // ----------------------------------------------------------
+//     // USER ID
+//     //
+//     // Primary ownership identifier.
+//     // ----------------------------------------------------------
+
+//     userId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "User",
+//       required: [true, "User ID is required"],
+//       index: true,
+//     },
+//   },
+//   {
+//     timestamps: true,
+//   }
+// );
+
+// // ============================================================
+// // CALCULATE BUDGET VALUES
+// // ============================================================
+
+// BudgetSchema.methods.calculateValues = function () {
+//   const allocated = Number(this.allocatedAmount) || 0;
+//   const spent = Number(this.spentAmount) || 0;
+
+//   this.allocatedAmount = Math.max(allocated, 0);
+//   this.spentAmount = Math.max(spent, 0);
+
+//   // ----------------------------------------------------------
+//   // REMAINING
+//   //
+//   // IMPORTANT:
+//   // We don't allow this value to become negative.
+//   // An over-budget amount is represented by percentageUsed/status.
+//   // ----------------------------------------------------------
+
+//   this.remainingAmount = Math.max(
+//     this.allocatedAmount - this.spentAmount,
+//     0
+//   );
+
+//   // ----------------------------------------------------------
+//   // PERCENTAGE
+//   // ----------------------------------------------------------
+
+//   this.percentageUsed =
+//     this.allocatedAmount > 0
+//       ? Number(
+//           (
+//             (this.spentAmount / this.allocatedAmount) *
+//             100
+//           ).toFixed(2)
+//         )
+//       : 0;
+
+//   // ----------------------------------------------------------
+//   // STATUS
+//   // ----------------------------------------------------------
+
+//   if (this.spentAmount > this.allocatedAmount) {
+//     this.status = "over-budget";
+//   } else if (this.percentageUsed >= 80) {
+//     this.status = "approaching-limit";
+//   } else if (
+//     this.spentAmount > 0 &&
+//     this.percentageUsed < 50
+//   ) {
+//     this.status = "under-budget";
+//   } else {
+//     this.status = "on-track";
+//   }
+// };
+
+// // ============================================================
+// // PRE SAVE
+// //
+// // IMPORTANT:
+// // No `next` argument.
+// // This prevents:
+// // "next is not a function"
+// // ============================================================
+
+// BudgetSchema.pre("save", function () {
+//   this.category = String(this.category || "")
+//     .trim()
+//     .toLowerCase();
+
+//   this.email = String(this.email || "")
+//     .trim()
+//     .toLowerCase();
+
+//   this.description = String(this.description || "").trim();
+
+//   this.calculateValues();
+// });
+
+// // ============================================================
+// // INDEXES
+// // ============================================================
+
+// // One budget per user/category/month/year.
+// BudgetSchema.index(
+//   {
+//     userId: 1,
+//     category: 1,
+//     month: 1,
+//     year: 1,
+//   },
+//   {
+//     unique: true,
+//   }
+// );
+
+// // Useful for email-based queries.
+// BudgetSchema.index({
+//   email: 1,
+//   month: 1,
+//   year: 1,
+// });
+
+// // ============================================================
+// // MODEL
+// // ============================================================
+
+// module.exports =
+//   mongoose.models.Budget ||
+//   mongoose.model("Budget", BudgetSchema);
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ============================================================
 // MODELS / BUDGET.JS
 // ============================================================
@@ -1453,6 +1717,10 @@ const BudgetSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: [0, "Remaining amount cannot be negative"],
+      validate: {
+        validator: Number.isFinite,
+        message: "Remaining amount must be a valid number",
+      },
     },
 
     // ----------------------------------------------------------
@@ -1462,7 +1730,12 @@ const BudgetSchema = new mongoose.Schema(
     percentageUsed: {
       type: Number,
       default: 0,
-      min: 0,
+      min: [0, "Percentage used cannot be negative"],
+      max: [100, "Percentage used cannot exceed 100"],
+      validate: {
+        validator: Number.isFinite,
+        message: "Percentage used must be a valid number",
+      },
     },
 
     // ----------------------------------------------------------
@@ -1471,12 +1744,15 @@ const BudgetSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: [
-        "on-track",
-        "approaching-limit",
-        "over-budget",
-        "under-budget",
-      ],
+      enum: {
+        values: [
+          "on-track",
+          "approaching-limit",
+          "over-budget",
+          "under-budget",
+        ],
+        message: "Invalid budget status",
+      },
       default: "on-track",
     },
 
@@ -1493,13 +1769,29 @@ const BudgetSchema = new mongoose.Schema(
       required: [true, "Month is required"],
       min: [0, "Month must be between 0 and 11"],
       max: [11, "Month must be between 0 and 11"],
+      validate: {
+        validator: Number.isInteger,
+        message: "Month must be a whole number",
+      },
     },
+
+    // ----------------------------------------------------------
+    // YEAR
+    // ----------------------------------------------------------
 
     year: {
       type: Number,
       required: [true, "Year is required"],
       min: [2000, "Invalid year"],
+      validate: {
+        validator: Number.isInteger,
+        message: "Year must be a whole number",
+      },
     },
+
+    // ----------------------------------------------------------
+    // DESCRIPTION
+    // ----------------------------------------------------------
 
     description: {
       type: String,
@@ -1510,6 +1802,8 @@ const BudgetSchema = new mongoose.Schema(
 
     // ----------------------------------------------------------
     // USER EMAIL
+    //
+    // Kept for compatibility with existing controllers.
     // ----------------------------------------------------------
 
     email: {
@@ -1553,8 +1847,8 @@ BudgetSchema.methods.calculateValues = function () {
   // REMAINING
   //
   // IMPORTANT:
-  // We don't allow this value to become negative.
-  // An over-budget amount is represented by percentageUsed/status.
+  // Remaining budget never becomes negative.
+  // Over-budget is represented through status/percentage.
   // ----------------------------------------------------------
 
   this.remainingAmount = Math.max(
@@ -1599,20 +1893,36 @@ BudgetSchema.methods.calculateValues = function () {
 //
 // IMPORTANT:
 // No `next` argument.
-// This prevents:
-// "next is not a function"
 // ============================================================
 
 BudgetSchema.pre("save", function () {
+  // ----------------------------------------------------------
+  // NORMALIZE CATEGORY
+  // ----------------------------------------------------------
+
   this.category = String(this.category || "")
     .trim()
     .toLowerCase();
+
+  // ----------------------------------------------------------
+  // NORMALIZE EMAIL
+  // ----------------------------------------------------------
 
   this.email = String(this.email || "")
     .trim()
     .toLowerCase();
 
-  this.description = String(this.description || "").trim();
+  // ----------------------------------------------------------
+  // NORMALIZE DESCRIPTION
+  // ----------------------------------------------------------
+
+  this.description = String(
+    this.description || ""
+  ).trim();
+
+  // ----------------------------------------------------------
+  // CALCULATE VALUES
+  // ----------------------------------------------------------
 
   this.calculateValues();
 });
@@ -1622,6 +1932,7 @@ BudgetSchema.pre("save", function () {
 // ============================================================
 
 // One budget per user/category/month/year.
+
 BudgetSchema.index(
   {
     userId: 1,
@@ -1635,6 +1946,7 @@ BudgetSchema.index(
 );
 
 // Useful for email-based queries.
+
 BudgetSchema.index({
   email: 1,
   month: 1,
@@ -1648,4 +1960,3 @@ BudgetSchema.index({
 module.exports =
   mongoose.models.Budget ||
   mongoose.model("Budget", BudgetSchema);
-
