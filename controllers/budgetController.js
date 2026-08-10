@@ -1,6 +1,6 @@
 const Budget = require("../models/Budget");
 const Income = require("../models/Income");
-const Notification = require("../models/IncomeNotification");
+const Notification = require("../models/Notification");
 
 // Create notification helper
 const createNotification = async (
@@ -30,72 +30,7 @@ const createNotification = async (
 };
 
 // GET ALL BUDGETS
-// exports.getBudgets = async (req, res) => {
-//   try {
-//     const { month, year, category, email } = req.query;
 
-//     const query = {};
-
-//     if (email) {
-//       query.email = email.toLowerCase();
-//     }
-
-//     if (month !== undefined) {
-//       query.month = Number(month);
-//     }
-
-//     if (year) {
-//       query.year = Number(year);
-//     }
-
-//     if (category && category !== "all") {
-//       query.category = category;
-//     }
-
-//     const budgets = await Budget.find(query).sort({
-//       year: -1,
-//       month: -1,
-//     });
-
-//     const totalAllocated = budgets.reduce(
-//       (sum, b) => sum + Number(b.allocatedAmount || 0),
-//       0,
-//     );
-
-//     const totalSpent = budgets.reduce(
-//       (sum, b) => sum + Number(b.spentAmount || 0),
-//       0,
-//     );
-
-//     const totalRemaining = totalAllocated - totalSpent;
-
-//     res.status(200).json({
-//       success: true,
-
-//       count: budgets.length,
-
-//       data: budgets,
-
-//       summary: {
-//         totalAllocated,
-//         totalSpent,
-//         totalRemaining,
-
-//         percentage: totalAllocated
-//           ? ((totalSpent / totalAllocated) * 100).toFixed(2)
-//           : 0,
-//       },
-//     });
-//   } catch (error) {
-//     console.error(error);
-
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to fetch budgets",
-//       error: error.message,
-//     });
-//   }
-// };
 
 exports.getBudgets = async (req, res) => {
   try {
