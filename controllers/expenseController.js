@@ -331,6 +331,411 @@ exports.getExpenses = async (req, res) => {
 // ============================================================
 // CREATE EXPENSE
 // ============================================================
+// exports.createExpense = async (req, res) => {
+//   const session = await mongoose.startSession();
+
+//   try {
+//     const {
+//       description,
+//       category,
+//       type,
+//       amount,
+//       date,
+//       user,
+//       email,
+//       userId,
+//     } = req.body;
+
+//     // ============================================================
+//     // 1. VALIDATION
+//     // ============================================================
+//     if (
+//       !description ||
+//       !category ||
+//       !amount ||
+//       !date ||
+//       !user ||
+//       !email ||
+//       !userId
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Required fields are missing",
+//       });
+//     }
+
+//     const expenseAmount = Number(amount);
+
+//     if (!Number.isFinite(expenseAmount) || expenseAmount <= 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Expense amount must be greater than 0",
+//       });
+//     }
+
+//     // ============================================================
+//     // 2. NORMALIZE DATA
+//     // ============================================================
+//     const normalizedEmail = email.toLowerCase().trim();
+//     const normalizedCategory = category.toLowerCase().trim();
+
+//     // ============================================================
+//     // 3. VALIDATE USER ID
+//     // ============================================================
+//     if (!mongoose.Types.ObjectId.isValid(userId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid userId",
+//       });
+//     }
+
+//     // ============================================================
+//     // 4. VALIDATE DATE
+//     // ============================================================
+//     const expenseDate = new Date(date);
+
+//     if (isNaN(expenseDate.getTime())) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid expense date",
+//       });
+//     }
+
+//     // JavaScript months:
+//     // January = 0
+//     // February = 1
+//     // ...
+//     // August = 7
+//     // December = 11
+
+//     const budgetMonth = expenseDate.getMonth();
+//     const budgetYear = expenseDate.getFullYear();
+
+//     // ============================================================
+//     // 5. START TRANSACTION
+//     // ============================================================
+//     session.startTransaction();
+
+//     // ============================================================
+//     // 6. FIND INCOME
+//     // ============================================================
+//     const income = await Income.findOne({
+//       userId,
+//     }).session(session);
+
+//     if (!income) {
+//       await session.abortTransaction();
+
+//       return res.status(404).json({
+//         success: false,
+//         message: "Income record not found",
+//       });
+//     }
+
+//     let incomeBalance = Number(income.balance) || 0;
+
+//     let remainingExpense = expenseAmount;
+//     let incomeUsed = 0;
+//     let savingsUsed = 0;
+
+//     // ============================================================
+//     // 7. USE INCOME FIRST
+//     // ============================================================
+//     if (incomeBalance > 0) {
+//       incomeUsed = Math.min(
+//         incomeBalance,
+//         remainingExpense
+//       );
+
+//       income.balance = incomeBalance - incomeUsed;
+
+//       await income.save({
+//         session,
+//       });
+
+//       remainingExpense -= incomeUsed;
+//     }
+
+//     // ============================================================
+//     // 8. USE SAVINGS AFTER INCOME REACHES ZERO
+//     // ============================================================
+//     if (remainingExpense > 0) {
+//       const savingsList = await Savings.find({
+//         email: normalizedEmail,
+//         currentAmount: {
+//           $gt: 0,
+//         },
+//       })
+//         .sort({
+//           currentAmount: -1,
+//         })
+//         .session(session);
+
+//       for (const saving of savingsList) {
+//         if (remainingExpense <= 0) {
+//           break;
+//         }
+
+//         const availableSavings =
+//           Number(saving.currentAmount) || 0;
+
+//         if (availableSavings <= 0) {
+//           continue;
+//         }
+
+//         const amountFromSaving = Math.min(
+//           availableSavings,
+//           remainingExpense
+//         );
+
+//         saving.currentAmount =
+//           availableSavings - amountFromSaving;
+
+//         if (saving.currentAmount < 0) {
+//           saving.currentAmount = 0;
+//         }
+
+//         await saving.save({
+//           session,
+//         });
+
+//         savingsUsed += amountFromSaving;
+
+//         remainingExpense -= amountFromSaving;
+//       }
+//     }
+
+//     // ============================================================
+//     // 9. CHECK AVAILABLE MONEY
+//     // ============================================================
+//     if (remainingExpense > 0) {
+//       await session.abortTransaction();
+
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Insufficient income and savings to cover this expense",
+
+//         expenseAmount,
+
+//         incomeUsed,
+
+//         savingsUsed,
+
+//         remainingAmount: remainingExpense,
+//       });
+//     }
+
+//     // ============================================================
+//     // 10. CREATE EXPENSE
+//     // ============================================================
+//     const [expense] = await Expense.create(
+//       [
+//         {
+//           description: description.trim(),
+
+//           category: normalizedCategory,
+
+//           type: type || "expense",
+
+//           amount: expenseAmount,
+
+//           date: expenseDate,
+
+//           user: user.trim(),
+
+//           userId,
+
+//           email: normalizedEmail,
+//         },
+//       ],
+//       {
+//         session,
+//       }
+//     );
+
+//     // ============================================================
+//     // 11. FIND MATCHING BUDGET
+//     //
+//     // IMPORTANT:
+//     // Your current Budget model has NO userId.
+//     //
+//     // Therefore we match using:
+//     //
+//     // category
+//     // month
+//     // year
+//     // email
+//     //
+//     // The email makes sure one user's budget
+//     // is not accidentally updated.
+//     // ============================================================
+//     const budget = await Budget.findOne({
+//       email: normalizedEmail,
+//       category: normalizedCategory,
+//       month: budgetMonth,
+//       year: budgetYear,
+//     }).session(session);
+
+//     let budgetUpdated = false;
+
+//     // ============================================================
+//     // 12. UPDATE BUDGET
+//     // ============================================================
+//     if (budget) {
+//       // Add expense to spent amount
+//       budget.spentAmount =
+//         Number(budget.spentAmount || 0) +
+//         expenseAmount;
+
+//       /*
+//        * IMPORTANT:
+//        *
+//        * budget.save() triggers your
+//        * BudgetSchema.pre("save") middleware.
+//        *
+//        * That middleware automatically updates:
+//        *
+//        * remainingAmount
+//        * percentageUsed
+//        * status
+//        */
+//       await budget.save({
+//         session,
+//       });
+
+//       budgetUpdated = true;
+//     }
+
+//     // ============================================================
+//     // 13. CREATE NOTIFICATION
+//     // ============================================================
+//     const [notification] = await Notification.create(
+//       [
+//         {
+//           userEmail: normalizedEmail,
+
+//           userId,
+
+//           title: "💸 Expense Recorded",
+
+//           message: `You spent ${expenseAmount} on ${normalizedCategory}`,
+
+//           type: "info",
+
+//           severity: "low",
+
+//           relatedId: expense._id,
+
+//           relatedModel: "Expense",
+//         },
+//       ],
+//       {
+//         session,
+//       }
+//     );
+
+//     // ============================================================
+//     // 14. COMMIT TRANSACTION
+//     // ============================================================
+//     await session.commitTransaction();
+
+//     // ============================================================
+//     // 15. RESPONSE
+//     // ============================================================
+//     return res.status(201).json({
+//       success: true,
+
+//       message: "Expense created successfully",
+
+//       data: expense,
+
+//       moneyUsed: {
+//         expenseAmount,
+//         incomeUsed,
+//         savingsUsed,
+//       },
+
+//       remainingIncomeBalance:
+//         income.balance,
+
+//       budgetUpdated,
+
+//       budget: budgetUpdated
+//         ? {
+//             id: budget._id,
+
+//             category: budget.category,
+
+//             month: budget.month,
+
+//             year: budget.year,
+
+//             allocatedAmount:
+//               budget.allocatedAmount,
+
+//             spentAmount:
+//               budget.spentAmount,
+
+//             remainingAmount:
+//               budget.remainingAmount,
+
+//             percentageUsed:
+//               budget.percentageUsed,
+
+//             status: budget.status,
+//           }
+//         : null,
+
+//       notification: {
+//         id: notification._id,
+
+//         title: notification.title,
+
+//         message: notification.message,
+
+//         type: notification.type,
+
+//         severity: notification.severity,
+
+//         relatedId: notification.relatedId,
+
+//         relatedModel: notification.relatedModel,
+//       },
+//     });
+//   } catch (error) {
+//     // ============================================================
+//     // ROLLBACK TRANSACTION
+//     // ============================================================
+//     try {
+//       await session.abortTransaction();
+//     } catch (abortError) {
+//       console.error(
+//         "❌ Transaction abort error:",
+//         abortError
+//       );
+//     }
+
+//     console.error(
+//       "❌ Create expense error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+
+//       message: "Failed to create expense",
+
+//       error: error.message,
+//     });
+//   } finally {
+//     // ============================================================
+//     // END SESSION
+//     // ============================================================
+//     await session.endSession();
+//   }
+// };
+
 exports.createExpense = async (req, res) => {
   const session = await mongoose.startSession();
 
@@ -557,18 +962,13 @@ exports.createExpense = async (req, res) => {
     // ============================================================
     // 11. FIND MATCHING BUDGET
     //
-    // IMPORTANT:
-    // Your current Budget model has NO userId.
+    // Budget must match:
+    // - email
+    // - category
+    // - month
+    // - year
     //
-    // Therefore we match using:
-    //
-    // category
-    // month
-    // year
-    // email
-    //
-    // The email makes sure one user's budget
-    // is not accidentally updated.
+    // Month is JavaScript 0-11.
     // ============================================================
     const budget = await Budget.findOne({
       email: normalizedEmail,
@@ -583,18 +983,12 @@ exports.createExpense = async (req, res) => {
     // 12. UPDATE BUDGET
     // ============================================================
     if (budget) {
-      // Add expense to spent amount
       budget.spentAmount =
         Number(budget.spentAmount || 0) +
         expenseAmount;
 
       /*
-       * IMPORTANT:
-       *
-       * budget.save() triggers your
-       * BudgetSchema.pre("save") middleware.
-       *
-       * That middleware automatically updates:
+       * BudgetSchema.pre("save") automatically calculates:
        *
        * remainingAmount
        * percentageUsed
@@ -608,7 +1002,7 @@ exports.createExpense = async (req, res) => {
     }
 
     // ============================================================
-    // 13. CREATE NOTIFICATION
+    // 13. CREATE EXPENSE NOTIFICATION
     // ============================================================
     const [notification] = await Notification.create(
       [
@@ -619,15 +1013,43 @@ exports.createExpense = async (req, res) => {
 
           title: "💸 Expense Recorded",
 
-          message: `You spent ${expenseAmount} on ${normalizedCategory}`,
+          message: `You spent ${expenseAmount.toFixed(
+            2
+          )} on ${normalizedCategory}`,
 
-          type: "info",
+          // IMPORTANT:
+          // "info" is NOT allowed by your Notification schema.
+          type: "expense",
 
           severity: "low",
 
+          isRead: false,
+
           relatedId: expense._id,
 
+          // This field exists in your Notification model
+          relatedType: "expense",
+
+          // This was added to your model to match controllers
           relatedModel: "Expense",
+
+          actionLink: `/expenses/${expense._id}`,
+
+          metadata: {
+            expenseId: expense._id,
+
+            amount: expenseAmount,
+
+            category: normalizedCategory,
+
+            description: description.trim(),
+
+            action: "created",
+
+            budgetUpdated,
+
+            budgetId: budget?._id || null,
+          },
         },
       ],
       {
@@ -657,7 +1079,7 @@ exports.createExpense = async (req, res) => {
       },
 
       remainingIncomeBalance:
-        income.balance,
+        Number(income.balance) || 0,
 
       budgetUpdated,
 
@@ -683,7 +1105,8 @@ exports.createExpense = async (req, res) => {
             percentageUsed:
               budget.percentageUsed,
 
-            status: budget.status,
+            status:
+              budget.status,
           }
         : null,
 
@@ -700,7 +1123,11 @@ exports.createExpense = async (req, res) => {
 
         relatedId: notification.relatedId,
 
-        relatedModel: notification.relatedModel,
+        relatedType:
+          notification.relatedType,
+
+        relatedModel:
+          notification.relatedModel,
       },
     });
   } catch (error) {
