@@ -1,47 +1,49 @@
 const Expense = require("../models/Expense");
 const mongoose = require("mongoose");
-
+const Income = require("../models/Income");
+const Savings = require("../models/Savings");
 const createNotification = require("../utils/createNotification");
+const Budget = require("../models/Budget");
 
-exports.createExpense = async (req, res) => {
-  try {
-    const { description, category, type, amount, date, user, email, userId } =
-      req.body;
+// exports.createExpense = async (req, res) => {
+//   try {
+//     const { description, category, type, amount, date, user, email, userId } =
+//       req.body;
 
-    // validation...
+//     // validation...
 
-    const expense = await Expense.create({
-      description: description.trim(),
-      category,
-      type: type || "expense",
-      amount: Number(amount),
-      date,
-      user: user.trim(),
-      userId,
-      email: email.toLowerCase().trim(),
-    });
+//     const expense = await Expense.create({
+//       description: description.trim(),
+//       category,
+//       type: type || "expense",
+//       amount: Number(amount),
+//       date,
+//       user: user.trim(),
+//       userId,
+//       email: email.toLowerCase().trim(),
+//     });
 
-    // ✅ MOVE IT HERE
-    await createNotification({
-      userId,
-      email,
-      title: "💸 Expense Recorded",
-      message: `You spent ${amount} on ${category}`,
-      type: "info",
-      referenceId: expense._id,
-      referenceModel: "Expense",
-    });
+//     // ✅ MOVE IT HERE
+//     await createNotification({
+//       userId,
+//       email,
+//       title: "💸 Expense Recorded",
+//       message: `You spent ${amount} on ${category}`,
+//       type: "info",
+//       referenceId: expense._id,
+//       referenceModel: "Expense",
+//     });
 
-    return res.status(201).json({
-      success: true,
-      message: "Expense created successfully",
-      data: expense,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
-  }
-};
+//     return res.status(201).json({
+//       success: true,
+//       message: "Expense created successfully",
+//       data: expense,
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: error.message });
+//   }
+// };
 
 // @desc    Get all expenses for a user
 // @route   GET /api/expenses
@@ -95,6 +97,357 @@ exports.getExpenses = async (req, res) => {
       message: "Failed to fetch expenses",
       error: error.message,
     });
+  }
+};
+// exports.createExpense = async (req, res) => {
+//   try {
+//     const {
+//       description,
+//       category,
+//       type,
+//       amount,
+//       date,
+//       user,
+//       email,
+//       userId,
+//     } = req.body;
+
+//     // validation...
+//     if (!description || !category || !amount || !user || !email || !userId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Required fields are missing",
+//       });
+//     }
+
+//     const expenseAmount = Number(amount);
+
+//     if (isNaN(expenseAmount) || expenseAmount <= 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Amount must be greater than 0",
+//       });
+//     }
+
+//     // 1. Create expense
+//     const expense = await Expense.create({
+//       description: description.trim(),
+//       category,
+//       type: type || "expense",
+//       amount: expenseAmount,
+//       date,
+//       user: user.trim(),
+//       userId,
+//       email: email.toLowerCase().trim(),
+//     });
+
+//     // 2. Subtract expense from income/balance
+//     const income = await Income.findOneAndUpdate(
+//       { userId },
+//       {
+//         $inc: {
+//           balance: -expenseAmount,
+//         },
+//       },
+//       {
+//         new: true,
+//       }
+//     );
+
+//     if (!income) {
+//       console.warn("⚠️ Income record not found for userId:", userId);
+//     }
+
+//     // 3. Notification
+//     await createNotification({
+//       userId,
+//       email,
+//       title: "💸 Expense Recorded",
+//       message: `You spent ${expenseAmount} on ${category}`,
+//       type: "info",
+//       referenceId: expense._id,
+//       referenceModel: "Expense",
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Expense created successfully",
+//       data: expense,
+//       balance: income?.balance ?? null,
+//     });
+//   } catch (error) {
+//     console.error("❌ Create expense error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
+// Make sure createNotification is imported
+// const { createNotification } = require("../utils/notification");
+
+exports.createExpense = async (req, res) => {
+  const session = await mongoose.startSession();
+
+  try {
+    const {
+      description,
+      category,
+      type,
+      amount,
+      date,
+      user,
+      email,
+      userId,
+    } = req.body;
+
+    // ============================================================
+    // VALIDATION
+    // ============================================================
+    if (
+      !description ||
+      !category ||
+      !amount ||
+      !date ||
+      !user ||
+      !email ||
+      !userId
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Required fields are missing",
+      });
+    }
+
+    const expenseAmount = Number(amount);
+
+    if (!Number.isFinite(expenseAmount) || expenseAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Expense amount must be greater than 0",
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedCategory = category.trim();
+
+    // ============================================================
+    // DATE
+    // ============================================================
+    const expenseDate = new Date(date);
+
+    if (isNaN(expenseDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid expense date",
+      });
+    }
+
+    const budgetMonth = expenseDate.getMonth();
+    const budgetYear = expenseDate.getFullYear();
+
+    // ============================================================
+    // START TRANSACTION
+    // ============================================================
+    session.startTransaction();
+
+    // ============================================================
+    // 1. FIND INCOME
+    // ============================================================
+    const income = await Income.findOne({
+      userId,
+    }).session(session);
+
+    if (!income) {
+      await session.abortTransaction();
+
+      return res.status(404).json({
+        success: false,
+        message: "Income record not found",
+      });
+    }
+
+    let incomeBalance = Number(income.balance) || 0;
+
+    let remainingExpense = expenseAmount;
+    let incomeUsed = 0;
+    let savingsUsed = 0;
+
+    // ============================================================
+    // 2. USE INCOME FIRST
+    // ============================================================
+    if (incomeBalance > 0) {
+      incomeUsed = Math.min(incomeBalance, remainingExpense);
+
+      income.balance = incomeBalance - incomeUsed;
+
+      await income.save({ session });
+
+      remainingExpense -= incomeUsed;
+    }
+
+    // ============================================================
+    // 3. USE SAVINGS ONLY AFTER INCOME REACHES ZERO
+    // ============================================================
+    if (remainingExpense > 0) {
+      const savingsList = await Savings.find({
+        email: normalizedEmail,
+        currentAmount: { $gt: 0 },
+      })
+        .sort({ currentAmount: -1 })
+        .session(session);
+
+      for (const saving of savingsList) {
+        if (remainingExpense <= 0) {
+          break;
+        }
+
+        const availableSavings = Number(saving.currentAmount) || 0;
+
+        if (availableSavings <= 0) {
+          continue;
+        }
+
+        const amountFromSaving = Math.min(
+          availableSavings,
+          remainingExpense
+        );
+
+        saving.currentAmount -= amountFromSaving;
+
+        if (saving.currentAmount < 0) {
+          saving.currentAmount = 0;
+        }
+
+        // Your Savings pre-save middleware will
+        // recalculate progress/isCompleted/completedDate.
+        await saving.save({ session });
+
+        savingsUsed += amountFromSaving;
+        remainingExpense -= amountFromSaving;
+      }
+    }
+
+    // ============================================================
+    // 4. CHECK IF THERE IS ENOUGH MONEY
+    // ============================================================
+    if (remainingExpense > 0) {
+      await session.abortTransaction();
+
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient income and savings to cover this expense",
+        expenseAmount,
+        incomeUsed,
+        savingsUsed,
+        remainingAmount: remainingExpense,
+      });
+    }
+
+    // ============================================================
+    // 5. CREATE EXPENSE
+    // ============================================================
+    const [expense] = await Expense.create(
+      [
+        {
+          description: description.trim(),
+          category: normalizedCategory,
+          type: type || "expense",
+          amount: expenseAmount,
+          date: expenseDate,
+          user: user.trim(),
+          userId,
+          email: normalizedEmail,
+        },
+      ],
+      { session }
+    );
+
+    // ============================================================
+    // 6. UPDATE BUDGET
+    // ============================================================
+    const budget = await Budget.findOne({
+      email: normalizedEmail,
+      category: normalizedCategory,
+      month: budgetMonth,
+      year: budgetYear,
+    }).session(session);
+
+    let budgetUpdated = false;
+
+    if (budget) {
+      budget.spentAmount =
+        Number(budget.spentAmount || 0) + expenseAmount;
+
+      await budget.save({ session });
+
+      budgetUpdated = true;
+    }
+
+    // ============================================================
+    // 7. CREATE NOTIFICATION
+    // ============================================================
+    await createNotification({
+      userId,
+      email: normalizedEmail,
+      title: "💸 Expense Recorded",
+      message: `You spent ${expenseAmount} on ${normalizedCategory}`,
+      type: "info",
+      referenceId: expense._id,
+      referenceModel: "Expense",
+    });
+
+    // ============================================================
+    // 8. COMMIT TRANSACTION
+    // ============================================================
+    await session.commitTransaction();
+
+    // ============================================================
+    // 9. RESPONSE
+    // ============================================================
+    return res.status(201).json({
+      success: true,
+      message: "Expense created successfully",
+
+      data: expense,
+
+      moneyUsed: {
+        expenseAmount,
+        incomeUsed,
+        savingsUsed,
+      },
+
+      remainingIncomeBalance: income.balance,
+
+      budget: budgetUpdated
+        ? {
+            category: budget.category,
+            allocatedAmount: budget.allocatedAmount,
+            spentAmount: budget.spentAmount,
+            remainingAmount: budget.remainingAmount,
+            percentageUsed: budget.percentageUsed,
+            status: budget.status,
+          }
+        : null,
+    });
+  } catch (error) {
+    try {
+      await session.abortTransaction();
+    } catch (abortError) {
+      console.error("❌ Transaction abort error:", abortError);
+    }
+
+    console.error("❌ Create expense error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create expense",
+      error: error.message,
+    });
+  } finally {
+    session.endSession();
   }
 };
 

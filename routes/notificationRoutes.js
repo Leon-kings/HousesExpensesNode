@@ -8,6 +8,7 @@ router.get("/statistics",notificationController.statistics);
 
 router.get("/user/:email",notificationController.getNotifications);
 
+router.get("/all",notificationController.getAllNotifications);
 router.get("/:id",notificationController.getNotification);
 
 router.put("/read/:id",notificationController.markAsRead);
