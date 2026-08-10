@@ -1,9 +1,6 @@
+// module.exports = mongoose.model('Budget', BudgetSchema);
 
-
-  // module.exports = mongoose.model('Budget', BudgetSchema);
-
-
-  const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 const BudgetSchema = new mongoose.Schema(
   {
@@ -11,6 +8,7 @@ const BudgetSchema = new mongoose.Schema(
       type: String,
       required: [true, "Category is required"],
       trim: true,
+      lowercase: true,
     },
 
     allocatedAmount: {
@@ -39,12 +37,7 @@ const BudgetSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: [
-        "on-track",
-        "approaching-limit",
-        "over-budget",
-        "under-budget",
-      ],
+      enum: ["on-track", "approaching-limit", "over-budget", "under-budget"],
       default: "on-track",
     },
 
@@ -75,7 +68,7 @@ const BudgetSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // One budget per category per month/year for each user
@@ -88,7 +81,7 @@ BudgetSchema.index(
   },
   {
     unique: true,
-  }
+  },
 );
 
 // Automatically calculate values
@@ -97,29 +90,19 @@ BudgetSchema.pre("save", function () {
   this.allocatedAmount = Number(this.allocatedAmount) || 0;
   this.spentAmount = Number(this.spentAmount) || 0;
 
-  this.remainingAmount = Math.max(
-    this.allocatedAmount - this.spentAmount,
-    0
-  );
+  this.remainingAmount = Math.max(this.allocatedAmount - this.spentAmount, 0);
 
   this.percentageUsed =
     this.allocatedAmount > 0
       ? (this.spentAmount / this.allocatedAmount) * 100
       : 0;
 
-
   if (this.percentageUsed >= 100) {
     this.status = "over-budget";
-
   } else if (this.percentageUsed >= 80) {
     this.status = "approaching-limit";
-
-  } else if (
-    this.percentageUsed < 50 &&
-    this.spentAmount > 0
-  ) {
+  } else if (this.percentageUsed < 50 && this.spentAmount > 0) {
     this.status = "under-budget";
-
   } else {
     this.status = "on-track";
   }
@@ -133,45 +116,29 @@ BudgetSchema.pre("findOneAndUpdate", async function () {
 
   if (!current) return;
 
-  const allocatedAmount =
-    Number(update.allocatedAmount ?? current.allocatedAmount);
-
-  const spentAmount =
-    Number(update.spentAmount ?? current.spentAmount);
-
-
-  update.remainingAmount = Math.max(
-    allocatedAmount - spentAmount,
-    0
+  const allocatedAmount = Number(
+    update.allocatedAmount ?? current.allocatedAmount,
   );
 
+  const spentAmount = Number(update.spentAmount ?? current.spentAmount);
+
+  update.remainingAmount = Math.max(allocatedAmount - spentAmount, 0);
 
   update.percentageUsed =
-    allocatedAmount > 0
-      ? (spentAmount / allocatedAmount) * 100
-      : 0;
-
+    allocatedAmount > 0 ? (spentAmount / allocatedAmount) * 100 : 0;
 
   if (update.percentageUsed >= 100) {
     update.status = "over-budget";
-
   } else if (update.percentageUsed >= 80) {
     update.status = "approaching-limit";
-
-  } else if (
-    update.percentageUsed < 50 &&
-    spentAmount > 0
-  ) {
+  } else if (update.percentageUsed < 50 && spentAmount > 0) {
     update.status = "under-budget";
-
   } else {
     update.status = "on-track";
   }
-
 
   this.setUpdate(update);
 });
 
 module.exports =
-  mongoose.models.Budget ||
-  mongoose.model("Budget", BudgetSchema);
+  mongoose.models.Budget || mongoose.model("Budget", BudgetSchema);
