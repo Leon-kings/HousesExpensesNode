@@ -71,108 +71,390 @@ const updateBudgetSpent = async (email, category, amount, month, year) => {
 // @desc    Get all incomes with budget summary
 // @route   GET /api/incomes
 // @access  Private
+// exports.getIncomes = async (req, res) => {
+//   try {
+//     const { category, source, startDate, endDate, search, month, year } =
+//       req.query;
+
+//     // Build query
+//     const query = {};
+
+//     if (category && category !== "all") {
+//       query.category = category;
+//     }
+
+//     if (source && source !== "all") {
+//       query.source = source;
+//     }
+
+//     if (startDate || endDate) {
+//       query.date = {};
+//       if (startDate) query.date.$gte = new Date(startDate);
+//       if (endDate) query.date.$lte = new Date(endDate);
+//     }
+
+//     if (search) {
+//       query.$or = [
+//         { description: { $regex: search, $options: "i" } },
+//         { category: { $regex: search, $options: "i" } },
+//         { source: { $regex: search, $options: "i" } },
+//         { user: { $regex: search, $options: "i" } },
+//         { email: { $regex: search, $options: "i" } },
+//       ];
+//     }
+
+//     // Fetch all matching incomes
+//     const incomes = await Income.find(query).sort({
+//       date: -1,
+//       createdAt: -1,
+//     });
+
+//     // Current month/year
+//     const currentMonth =
+//       month !== undefined ? parseInt(month) : new Date().getMonth();
+//     const currentYear = year ? parseInt(year) : new Date().getFullYear();
+
+//     // Fetch ALL budgets (no email filter)
+//     const budgets = await Budget.find({
+//       month: currentMonth,
+//       year: currentYear,
+//     });
+
+//     // Calculate monthly income
+//     const monthIncomes = incomes.filter((inc) => {
+//       const d = new Date(inc.date);
+//       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+//     });
+
+//     const totalMonthlyIncome = monthIncomes.reduce(
+//       (sum, inc) => sum + inc.amount,
+//       0,
+//     );
+
+//     const totalBudgeted = budgets.reduce(
+//       (sum, b) => sum + b.allocatedAmount,
+//       0,
+//     );
+
+//     const totalSpent = budgets.reduce(
+//       (sum, b) => sum + (b.spentAmount || 0),
+//       0,
+//     );
+
+//     const remainingBudget = totalBudgeted - totalSpent;
+
+//     const budgetSummary = budgets.map((budget) => ({
+//       category: budget.category,
+//       allocated: budget.allocatedAmount,
+//       spent: budget.spentAmount || 0,
+//       remaining: budget.remainingAmount || 0,
+//       percentageUsed: budget.percentageUsed || 0,
+//       status: budget.status || "on-track",
+//     }));
+
+//     res.status(200).json({
+//       success: true,
+//       count: incomes.length,
+//       data: incomes,
+//       budgetSummary: {
+//         totalBudgeted,
+//         totalSpent,
+//         remainingBudget,
+//         totalMonthlyIncome,
+//         savingsRate:
+//           totalMonthlyIncome > 0
+//             ? ((totalMonthlyIncome - totalSpent) / totalMonthlyIncome) * 100
+//             : 0,
+//         categories: budgetSummary,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Get incomes error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch incomes",
+//       error: error.message,
+//     });
+//   }
+// };
+
 exports.getIncomes = async (req, res) => {
   try {
-    const { category, source, startDate, endDate, search, month, year } =
-      req.query;
+    const {
+      category,
+      source,
+      startDate,
+      endDate,
+      search,
+      month,
+      year,
+    } = req.query;
 
-    // Build query
+    // ============================================================
+    // BUILD INCOME QUERY
+    // ============================================================
     const query = {};
 
-    if (category && category !== "all") {
+    if (
+      category &&
+      category !== "all"
+    ) {
       query.category = category;
     }
 
-    if (source && source !== "all") {
+    if (
+      source &&
+      source !== "all"
+    ) {
       query.source = source;
     }
 
+    // ============================================================
+    // DATE FILTER
+    // ============================================================
     if (startDate || endDate) {
       query.date = {};
-      if (startDate) query.date.$gte = new Date(startDate);
-      if (endDate) query.date.$lte = new Date(endDate);
+
+      if (startDate) {
+        query.date.$gte =
+          new Date(startDate);
+      }
+
+      if (endDate) {
+        const end = new Date(endDate);
+
+        // Include the entire end date
+        end.setHours(
+          23,
+          59,
+          59,
+          999
+        );
+
+        query.date.$lte = end;
+      }
     }
 
+    // ============================================================
+    // SEARCH
+    // ============================================================
     if (search) {
       query.$or = [
-        { description: { $regex: search, $options: "i" } },
-        { category: { $regex: search, $options: "i" } },
-        { source: { $regex: search, $options: "i" } },
-        { user: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
+        {
+          description: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+
+        {
+          category: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+
+        {
+          source: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+
+        {
+          user: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+
+        {
+          email: {
+            $regex: search,
+            $options: "i",
+          },
+        },
       ];
     }
 
-    // Fetch all matching incomes
-    const incomes = await Income.find(query).sort({
+    // ============================================================
+    // FETCH INCOMES
+    // ============================================================
+    const incomes = await Income.find(
+      query
+    ).sort({
       date: -1,
       createdAt: -1,
     });
 
-    // Current month/year
+    // ============================================================
+    // CURRENT / REQUESTED MONTH AND YEAR
+    //
+    // JavaScript:
+    // January = 0
+    // December = 11
+    // ============================================================
     const currentMonth =
-      month !== undefined ? parseInt(month) : new Date().getMonth();
-    const currentYear = year ? parseInt(year) : new Date().getFullYear();
+      month !== undefined
+        ? parseInt(month, 10)
+        : new Date().getMonth();
 
-    // Fetch ALL budgets (no email filter)
+    const currentYear =
+      year !== undefined
+        ? parseInt(year, 10)
+        : new Date().getFullYear();
+
+    // ============================================================
+    // FETCH ALL BUDGETS FOR MONTH/YEAR
+    //
+    // No email filter here, as requested.
+    // ============================================================
     const budgets = await Budget.find({
       month: currentMonth,
       year: currentYear,
     });
 
-    // Calculate monthly income
-    const monthIncomes = incomes.filter((inc) => {
-      const d = new Date(inc.date);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    });
+    // ============================================================
+    // CALCULATE MONTHLY INCOME
+    // ============================================================
+    const monthIncomes =
+      incomes.filter((income) => {
+        const incomeDate =
+          new Date(income.date);
 
-    const totalMonthlyIncome = monthIncomes.reduce(
-      (sum, inc) => sum + inc.amount,
-      0,
-    );
+        return (
+          incomeDate.getMonth() ===
+            currentMonth &&
+          incomeDate.getFullYear() ===
+            currentYear
+        );
+      });
 
-    const totalBudgeted = budgets.reduce(
-      (sum, b) => sum + b.allocatedAmount,
-      0,
-    );
+    const totalMonthlyIncome =
+      monthIncomes.reduce(
+        (sum, income) =>
+          sum +
+          Number(income.amount || 0),
+        0
+      );
 
-    const totalSpent = budgets.reduce(
-      (sum, b) => sum + (b.spentAmount || 0),
-      0,
-    );
+    // ============================================================
+    // CALCULATE BUDGET TOTALS
+    // ============================================================
+    const totalBudgeted =
+      budgets.reduce(
+        (sum, budget) =>
+          sum +
+          Number(
+            budget.allocatedAmount || 0
+          ),
+        0
+      );
 
-    const remainingBudget = totalBudgeted - totalSpent;
+    const totalSpent =
+      budgets.reduce(
+        (sum, budget) =>
+          sum +
+          Number(
+            budget.spentAmount || 0
+          ),
+        0
+      );
 
-    const budgetSummary = budgets.map((budget) => ({
-      category: budget.category,
-      allocated: budget.allocatedAmount,
-      spent: budget.spentAmount || 0,
-      remaining: budget.remainingAmount || 0,
-      percentageUsed: budget.percentageUsed || 0,
-      status: budget.status || "on-track",
-    }));
+    const remainingBudget =
+      totalBudgeted - totalSpent;
 
-    res.status(200).json({
+    // ============================================================
+    // BUDGET CATEGORY SUMMARY
+    // ============================================================
+    const budgetSummary =
+      budgets.map((budget) => ({
+        id: budget._id,
+
+        category:
+          budget.category,
+
+        allocated:
+          Number(
+            budget.allocatedAmount || 0
+          ),
+
+        spent:
+          Number(
+            budget.spentAmount || 0
+          ),
+
+        remaining:
+          Number(
+            budget.remainingAmount || 0
+          ),
+
+        percentageUsed:
+          Number(
+            budget.percentageUsed || 0
+          ),
+
+        status:
+          budget.status ||
+          "on-track",
+
+        month:
+          budget.month,
+
+        year:
+          budget.year,
+      }));
+
+    // ============================================================
+    // SAVINGS RATE
+    // ============================================================
+    const savingsRate =
+      totalMonthlyIncome > 0
+        ? ((totalMonthlyIncome -
+            totalSpent) /
+            totalMonthlyIncome) *
+          100
+        : 0;
+
+    // ============================================================
+    // RESPONSE
+    // ============================================================
+    return res.status(200).json({
       success: true,
+
       count: incomes.length,
+
       data: incomes,
+
       budgetSummary: {
         totalBudgeted,
+
         totalSpent,
+
         remainingBudget,
+
         totalMonthlyIncome,
+
         savingsRate:
-          totalMonthlyIncome > 0
-            ? ((totalMonthlyIncome - totalSpent) / totalMonthlyIncome) * 100
-            : 0,
-        categories: budgetSummary,
+          Number(
+            savingsRate.toFixed(2)
+          ),
+
+        categories:
+          budgetSummary,
       },
     });
   } catch (error) {
-    console.error("Get incomes error:", error);
-    res.status(500).json({
+    console.error(
+      "❌ Get incomes error:",
+      error
+    );
+
+    return res.status(500).json({
       success: false,
+
       message: "Failed to fetch incomes",
+
       error: error.message,
     });
   }
