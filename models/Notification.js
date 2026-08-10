@@ -699,6 +699,196 @@
 
 
 
+// const mongoose = require("mongoose");
+
+// const notificationSchema = new mongoose.Schema(
+//   {
+//     userEmail: {
+//       type: String,
+//       required: true,
+//       trim: true,
+//       lowercase: true,
+//       index: true,
+//     },
+
+//     userId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "User",
+//       index: true,
+//     },
+
+//     title: {
+//       type: String,
+//       required: true,
+//       trim: true,
+//     },
+
+//     message: {
+//       type: String,
+//       required: true,
+//       trim: true,
+//     },
+
+//     type: {
+//       type: String,
+//       enum: [
+//         "contact",
+//         "system",
+//         "account",
+//         "expense",
+//         "income",
+//         "warning",
+//         "alert",
+//         "savings_milestone",
+//       ],
+//       default: "system",
+//     },
+
+//     severity: {
+//       type: String,
+//       enum: ["low", "medium", "high"],
+//       default: "low",
+//     },
+
+//     isRead: {
+//       type: Boolean,
+//       default: false,
+//     },
+
+//     readAt: {
+//       type: Date,
+//       default: null,
+//     },
+
+//     relatedId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       default: null,
+//     },
+
+//     relatedType: {
+//       type: String,
+//       enum: [
+//         "expense",
+//         "income",
+//         "budget",
+//         "savings",
+//         "system",
+//       ],
+//       default: "system",
+//     },
+
+//     actionLink: {
+//       type: String,
+//       default: "",
+//     },
+
+//     metadata: {
+//       type: mongoose.Schema.Types.Mixed,
+//       default: {},
+//     },
+//   },
+//   {
+//     timestamps: true,
+//   }
+// );
+
+// // ============================================================
+// // INDEXES
+// // ============================================================
+
+// notificationSchema.index({
+//   userEmail: 1,
+//   createdAt: -1,
+// });
+
+// notificationSchema.index({
+//   userEmail: 1,
+//   isRead: 1,
+// });
+
+// notificationSchema.index({
+//   userId: 1,
+//   isRead: 1,
+// });
+
+// // ============================================================
+// // MARK AS READ
+// // ============================================================
+
+// notificationSchema.methods.markAsRead = function () {
+//   this.isRead = true;
+//   this.readAt = new Date();
+
+//   return this.save();
+// };
+
+// // ============================================================
+// // USER STATISTICS
+// // ============================================================
+
+// notificationSchema.statics.getUserStats = async function (userEmail) {
+//   const normalizedEmail = userEmail.toLowerCase().trim();
+
+//   const [total, unread, read] = await Promise.all([
+//     this.countDocuments({
+//       userEmail: normalizedEmail,
+//     }),
+
+//     this.countDocuments({
+//       userEmail: normalizedEmail,
+//       isRead: false,
+//     }),
+
+//     this.countDocuments({
+//       userEmail: normalizedEmail,
+//       isRead: true,
+//     }),
+//   ]);
+
+//   return {
+//     total,
+//     unread,
+//     read,
+//   };
+// };
+
+// // ============================================================
+// // DELETE OLD READ NOTIFICATIONS
+// // ============================================================
+
+// notificationSchema.statics.cleanOldNotifications = async function (
+//   days = 30
+// ) {
+//   const cutoff = new Date();
+
+//   cutoff.setDate(cutoff.getDate() - days);
+
+//   return this.deleteMany({
+//     isRead: true,
+//     createdAt: {
+//       $lt: cutoff,
+//     },
+//   });
+// };
+
+// module.exports =
+//   mongoose.models.Notification ||
+//   mongoose.model("Notification", notificationSchema);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const mongoose = require("mongoose");
 
 const notificationSchema = new mongoose.Schema(
@@ -792,10 +982,6 @@ const notificationSchema = new mongoose.Schema(
   }
 );
 
-// ============================================================
-// INDEXES
-// ============================================================
-
 notificationSchema.index({
   userEmail: 1,
   createdAt: -1,
@@ -810,66 +996,6 @@ notificationSchema.index({
   userId: 1,
   isRead: 1,
 });
-
-// ============================================================
-// MARK AS READ
-// ============================================================
-
-notificationSchema.methods.markAsRead = function () {
-  this.isRead = true;
-  this.readAt = new Date();
-
-  return this.save();
-};
-
-// ============================================================
-// USER STATISTICS
-// ============================================================
-
-notificationSchema.statics.getUserStats = async function (userEmail) {
-  const normalizedEmail = userEmail.toLowerCase().trim();
-
-  const [total, unread, read] = await Promise.all([
-    this.countDocuments({
-      userEmail: normalizedEmail,
-    }),
-
-    this.countDocuments({
-      userEmail: normalizedEmail,
-      isRead: false,
-    }),
-
-    this.countDocuments({
-      userEmail: normalizedEmail,
-      isRead: true,
-    }),
-  ]);
-
-  return {
-    total,
-    unread,
-    read,
-  };
-};
-
-// ============================================================
-// DELETE OLD READ NOTIFICATIONS
-// ============================================================
-
-notificationSchema.statics.cleanOldNotifications = async function (
-  days = 30
-) {
-  const cutoff = new Date();
-
-  cutoff.setDate(cutoff.getDate() - days);
-
-  return this.deleteMany({
-    isRead: true,
-    createdAt: {
-      $lt: cutoff,
-    },
-  });
-};
 
 module.exports =
   mongoose.models.Notification ||
