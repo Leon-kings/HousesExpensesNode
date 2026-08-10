@@ -1277,6 +1277,253 @@ exports.getIncome = async (req, res) => {
 // CREATE INCOME
 // ============================================================
 
+// exports.createIncome = async (req, res) => {
+//   try {
+//     const {
+//       description,
+//       category,
+//       source,
+//       amount,
+//       date,
+//       user,
+//       email,
+//       userId,
+//       isRecurring,
+//       frequency,
+//     } = req.body;
+
+//     // ============================================================
+//     // REQUIRED FIELDS
+//     // ============================================================
+
+//     if (
+//       !description ||
+//       !category ||
+//       amount === undefined ||
+//       !date ||
+//       !user ||
+//       !email ||
+//       !userId
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "All fields are required",
+//       });
+//     }
+
+//     // ============================================================
+//     // USER ID
+//     // ============================================================
+
+//     if (
+//       !mongoose.Types.ObjectId.isValid(
+//         userId
+//       )
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid userId",
+//       });
+//     }
+
+//     // ============================================================
+//     // AMOUNT
+//     // ============================================================
+
+//     const numericAmount =
+//       Number(amount);
+
+//     if (
+//       !Number.isFinite(
+//         numericAmount
+//       ) ||
+//       !Number.isInteger(
+//         numericAmount
+//       ) ||
+//       numericAmount <= 0
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Amount must be a positive whole number",
+//       });
+//     }
+
+//     // ============================================================
+//     // DATE
+//     // ============================================================
+
+//     const incomeDate =
+//       new Date(date);
+
+//     if (
+//       Number.isNaN(
+//         incomeDate.getTime()
+//       )
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid income date",
+//       });
+//     }
+
+//     // ============================================================
+//     // NORMALIZE
+//     // ============================================================
+
+//     const normalizedEmail =
+//       email.trim().toLowerCase();
+
+//     const normalizedDescription =
+//       description.trim();
+
+//     const normalizedCategory =
+//       category.trim();
+
+//     const normalizedUser =
+//       user.trim();
+
+//     const normalizedSource =
+//       source?.trim() ||
+//       normalizedCategory;
+
+//     // ============================================================
+//     // CREATE INCOME
+//     //
+//     // remainingAmount starts equal to amount.
+//     // The Income model also protects this.
+//     // ============================================================
+
+//     const income =
+//       await Income.create({
+//         description:
+//           normalizedDescription,
+
+//         category:
+//           normalizedCategory,
+
+//         source:
+//           normalizedSource,
+
+//         amount:
+//           numericAmount,
+
+//         remainingAmount:
+//           numericAmount,
+
+//         date:
+//           incomeDate,
+
+//         user:
+//           normalizedUser,
+
+//         userId,
+
+//         email:
+//           normalizedEmail,
+
+//         isRecurring:
+//           Boolean(isRecurring),
+
+//         frequency:
+//           frequency || "monthly",
+//       });
+
+//     // ============================================================
+//     // NOTIFICATION
+//     // ============================================================
+
+//     const notification =
+//       await createNotification({
+//         userEmail:
+//           normalizedEmail,
+
+//         userId,
+
+//         title:
+//           "💰 Income Added",
+
+//         message:
+//           `You received RWF ${numericAmount.toLocaleString()} ` +
+//           `from ${normalizedSource}.`,
+
+//         type: "income",
+
+//         severity: "low",
+
+//         relatedId:
+//           income._id,
+
+//         relatedType:
+//           "income",
+
+//         actionLink:
+//           `/incomes/${income._id}`,
+
+//         metadata: {
+//           incomeId:
+//             income._id,
+
+//           amount:
+//             numericAmount,
+
+//           category:
+//             normalizedCategory,
+
+//           source:
+//             normalizedSource,
+
+//           remainingAmount:
+//             income.remainingAmount,
+//         },
+//       });
+
+//     return res.status(201).json({
+//       success: true,
+
+//       message:
+//         "Income created successfully",
+
+//       data: income,
+
+//       notification,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Create income error:",
+//       error
+//     );
+
+//     if (
+//       error.name ===
+//       "ValidationError"
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+
+//         message:
+//           "Income validation failed",
+
+//         errors: Object.values(
+//           error.errors
+//         ).map(
+//           (err) => err.message
+//         ),
+//       });
+//     }
+
+//     return res.status(500).json({
+//       success: false,
+
+//       message:
+//         "Failed to create income",
+
+//       error: error.message,
+//     });
+//   }
+// };
+
 exports.createIncome = async (req, res) => {
   try {
     const {
@@ -1292,9 +1539,9 @@ exports.createIncome = async (req, res) => {
       frequency,
     } = req.body;
 
-    // ============================================================
-    // REQUIRED FIELDS
-    // ============================================================
+    // ========================================================
+    // VALIDATION
+    // ========================================================
 
     if (
       !description ||
@@ -1307,218 +1554,100 @@ exports.createIncome = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "All fields are required",
+        message: "All income fields are required",
       });
     }
 
-    // ============================================================
-    // USER ID
-    // ============================================================
-
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        userId
-      )
-    ) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid userId",
       });
     }
 
-    // ============================================================
-    // AMOUNT
-    // ============================================================
-
-    const numericAmount =
-      Number(amount);
+    const numericAmount = Number(amount);
 
     if (
-      !Number.isFinite(
-        numericAmount
-      ) ||
-      !Number.isInteger(
-        numericAmount
-      ) ||
+      !Number.isFinite(numericAmount) ||
       numericAmount <= 0
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Amount must be a positive whole number",
+        message: "Amount must be greater than zero",
       });
     }
-
-    // ============================================================
-    // DATE
-    // ============================================================
-
-    const incomeDate =
-      new Date(date);
-
-    if (
-      Number.isNaN(
-        incomeDate.getTime()
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid income date",
-      });
-    }
-
-    // ============================================================
-    // NORMALIZE
-    // ============================================================
 
     const normalizedEmail =
       email.trim().toLowerCase();
 
-    const normalizedDescription =
-      description.trim();
-
-    const normalizedCategory =
-      category.trim();
-
-    const normalizedUser =
-      user.trim();
-
-    const normalizedSource =
-      source?.trim() ||
-      normalizedCategory;
-
-    // ============================================================
+    // ========================================================
     // CREATE INCOME
-    //
-    // remainingAmount starts equal to amount.
-    // The Income model also protects this.
-    // ============================================================
+    // ========================================================
 
-    const income =
-      await Income.create({
-        description:
-          normalizedDescription,
+    const income = await Income.create({
+      description: description.trim(),
 
-        category:
-          normalizedCategory,
+      category: category.trim(),
 
-        source:
-          normalizedSource,
+      source: source
+        ? source.trim()
+        : "",
 
-        amount:
-          numericAmount,
+      amount: numericAmount,
 
-        remainingAmount:
-          numericAmount,
+      // IMPORTANT
+      remainingAmount: numericAmount,
 
-        date:
-          incomeDate,
+      date: new Date(date),
 
-        user:
-          normalizedUser,
+      user: user.trim(),
 
-        userId,
+      userId,
 
-        email:
-          normalizedEmail,
+      email: normalizedEmail,
 
-        isRecurring:
-          Boolean(isRecurring),
+      isRecurring:
+        Boolean(isRecurring),
 
-        frequency:
-          frequency || "monthly",
-      });
+      frequency:
+        frequency || "monthly",
+    });
 
-    // ============================================================
+    // ========================================================
     // NOTIFICATION
-    // ============================================================
+    // ========================================================
 
-    const notification =
-      await createNotification({
-        userEmail:
-          normalizedEmail,
+    await createNotification({
+      userId,
+      email: normalizedEmail,
 
-        userId,
+      title: "💰 Income Added",
 
-        title:
-          "💰 Income Added",
+      message:
+        `Income of RWF ` +
+        `${numericAmount.toLocaleString()} ` +
+        `was added to your account.`,
 
-        message:
-          `You received RWF ${numericAmount.toLocaleString()} ` +
-          `from ${normalizedSource}.`,
+      type: "income",
 
-        type: "income",
+      severity: "low",
 
-        severity: "low",
+      referenceId: income._id,
 
-        relatedId:
-          income._id,
-
-        relatedType:
-          "income",
-
-        actionLink:
-          `/incomes/${income._id}`,
-
-        metadata: {
-          incomeId:
-            income._id,
-
-          amount:
-            numericAmount,
-
-          category:
-            normalizedCategory,
-
-          source:
-            normalizedSource,
-
-          remainingAmount:
-            income.remainingAmount,
-        },
-      });
+      referenceModel: "Income",
+    });
 
     return res.status(201).json({
       success: true,
-
-      message:
-        "Income created successfully",
-
+      message: "Income created successfully",
       data: income,
-
-      notification,
     });
   } catch (error) {
-    console.error(
-      "❌ Create income error:",
-      error
-    );
-
-    if (
-      error.name ===
-      "ValidationError"
-    ) {
-      return res.status(400).json({
-        success: false,
-
-        message:
-          "Income validation failed",
-
-        errors: Object.values(
-          error.errors
-        ).map(
-          (err) => err.message
-        ),
-      });
-    }
+    console.error("Create income error:", error);
 
     return res.status(500).json({
       success: false,
-
-      message:
-        "Failed to create income",
-
+      message: "Failed to create income",
       error: error.message,
     });
   }
