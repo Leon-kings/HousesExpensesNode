@@ -401,13 +401,13 @@ exports.createExpense = async (req, res) => {
       });
     }
 
-    // JavaScript:
+    // JavaScript months:
     // January = 0
     // February = 1
     // ...
     // August = 7
-    // ...
     // December = 11
+
     const budgetMonth = expenseDate.getMonth();
     const budgetYear = expenseDate.getFullYear();
 
@@ -417,7 +417,7 @@ exports.createExpense = async (req, res) => {
     session.startTransaction();
 
     // ============================================================
-    // 6. FIND USER'S INCOME
+    // 6. FIND INCOME
     // ============================================================
     const income = await Income.findOne({
       userId,
@@ -449,20 +449,26 @@ exports.createExpense = async (req, res) => {
 
       income.balance = incomeBalance - incomeUsed;
 
-      await income.save({ session });
+      await income.save({
+        session,
+      });
 
       remainingExpense -= incomeUsed;
     }
 
     // ============================================================
-    // 8. USE SAVINGS ONLY AFTER INCOME IS ZERO
+    // 8. USE SAVINGS AFTER INCOME REACHES ZERO
     // ============================================================
     if (remainingExpense > 0) {
       const savingsList = await Savings.find({
         email: normalizedEmail,
-        currentAmount: { $gt: 0 },
+        currentAmount: {
+          $gt: 0,
+        },
       })
-        .sort({ currentAmount: -1 })
+        .sort({
+          currentAmount: -1,
+        })
         .session(session);
 
       for (const saving of savingsList) {
@@ -489,7 +495,9 @@ exports.createExpense = async (req, res) => {
           saving.currentAmount = 0;
         }
 
-        await saving.save({ session });
+        await saving.save({
+          session,
+        });
 
         savingsUsed += amountFromSaving;
 
@@ -541,23 +549,29 @@ exports.createExpense = async (req, res) => {
           email: normalizedEmail,
         },
       ],
-      { session }
+      {
+        session,
+      }
     );
 
     // ============================================================
     // 11. FIND MATCHING BUDGET
     //
     // IMPORTANT:
-    // We DO NOT use email here.
+    // Your current Budget model has NO userId.
     //
-    // Budget must match:
-    // userId
+    // Therefore we match using:
+    //
     // category
     // month
     // year
+    // email
+    //
+    // The email makes sure one user's budget
+    // is not accidentally updated.
     // ============================================================
     const budget = await Budget.findOne({
-      userId: userId,
+      email: normalizedEmail,
       category: normalizedCategory,
       month: budgetMonth,
       year: budgetYear,
@@ -569,21 +583,26 @@ exports.createExpense = async (req, res) => {
     // 12. UPDATE BUDGET
     // ============================================================
     if (budget) {
+      // Add expense to spent amount
       budget.spentAmount =
         Number(budget.spentAmount || 0) +
         expenseAmount;
 
       /*
-       * budget.save() triggers your Budget
-       * pre("save") middleware.
+       * IMPORTANT:
        *
-       * It automatically calculates:
+       * budget.save() triggers your
+       * BudgetSchema.pre("save") middleware.
+       *
+       * That middleware automatically updates:
        *
        * remainingAmount
        * percentageUsed
        * status
        */
-      await budget.save({ session });
+      await budget.save({
+        session,
+      });
 
       budgetUpdated = true;
     }
@@ -591,20 +610,30 @@ exports.createExpense = async (req, res) => {
     // ============================================================
     // 13. CREATE NOTIFICATION
     // ============================================================
-    await createNotification({
-      userId,
-      email: normalizedEmail,
+    const [notification] = await Notification.create(
+      [
+        {
+          userEmail: normalizedEmail,
 
-      title: "💸 Expense Recorded",
+          userId,
 
-      message: `You spent ${expenseAmount} on ${normalizedCategory}`,
+          title: "💸 Expense Recorded",
 
-      type: "info",
+          message: `You spent ${expenseAmount} on ${normalizedCategory}`,
 
-      referenceId: expense._id,
+          type: "info",
 
-      referenceModel: "Expense",
-    });
+          severity: "low",
+
+          relatedId: expense._id,
+
+          relatedModel: "Expense",
+        },
+      ],
+      {
+        session,
+      }
+    );
 
     // ============================================================
     // 14. COMMIT TRANSACTION
@@ -627,7 +656,8 @@ exports.createExpense = async (req, res) => {
         savingsUsed,
       },
 
-      remainingIncomeBalance: income.balance,
+      remainingIncomeBalance:
+        income.balance,
 
       budgetUpdated,
 
@@ -656,6 +686,22 @@ exports.createExpense = async (req, res) => {
             status: budget.status,
           }
         : null,
+
+      notification: {
+        id: notification._id,
+
+        title: notification.title,
+
+        message: notification.message,
+
+        type: notification.type,
+
+        severity: notification.severity,
+
+        relatedId: notification.relatedId,
+
+        relatedModel: notification.relatedModel,
+      },
     });
   } catch (error) {
     // ============================================================
@@ -677,7 +723,9 @@ exports.createExpense = async (req, res) => {
 
     return res.status(500).json({
       success: false,
+
       message: "Failed to create expense",
+
       error: error.message,
     });
   } finally {
