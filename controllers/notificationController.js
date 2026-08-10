@@ -4,23 +4,62 @@ const Notification = require("../models/Notification");
                Get User Notifications
             =========================================== */
 
+// exports.getNotifications = async (req, res) => {
+//   try {
+//     const notifications = await Notification.find({
+//       userEmail: req.params.email,
+//     }).sort({ createdAt: -1 });
+
+//     res.json({
+//       success: true,
+//       notifications,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
 exports.getNotifications = async (req, res) => {
   try {
     const notifications = await Notification.find({
-      userEmail: req.params.email,
+      userEmail: req.params.email.toLowerCase(),
     }).sort({ createdAt: -1 });
 
-    res.json({
+    return res.json({
       success: true,
+      count: notifications.length,
       notifications,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
+
+// exports.getAllNotifications = async (req, res) => {
+//   try {
+//     const notifications = await Notification.find({}).sort({ createdAt: -1 });
+
+//     return res.status(200).json({
+//       success: true,
+//       count: notifications.length,
+//       notifications,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error fetching notifications:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch notifications",
+//       error: error.message,
+//     });
+//   }
+// };
 
 exports.getAllNotifications = async (req, res) => {
   try {
@@ -28,20 +67,23 @@ exports.getAllNotifications = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+
       count: notifications.length,
+
       notifications,
     });
   } catch (error) {
-    console.error("❌ Error fetching notifications:", error);
+    console.error("❌ Error fetching all notifications:", error);
 
     return res.status(500).json({
       success: false,
+
       message: "Failed to fetch notifications",
+
       error: error.message,
     });
   }
 };
-
 /* ===========================================
                Get Notification By ID
             =========================================== */
