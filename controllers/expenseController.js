@@ -5,45 +5,6 @@ const Savings = require("../models/Savings");
 const createNotification = require("../utils/createNotification");
 const Budget = require("../models/Budget");
 
-// exports.createExpense = async (req, res) => {
-//   try {
-//     const { description, category, type, amount, date, user, email, userId } =
-//       req.body;
-
-//     // validation...
-
-//     const expense = await Expense.create({
-//       description: description.trim(),
-//       category,
-//       type: type || "expense",
-//       amount: Number(amount),
-//       date,
-//       user: user.trim(),
-//       userId,
-//       email: email.toLowerCase().trim(),
-//     });
-
-//     // ✅ MOVE IT HERE
-//     await createNotification({
-//       userId,
-//       email,
-//       title: "💸 Expense Recorded",
-//       message: `You spent ${amount} on ${category}`,
-//       type: "info",
-//       referenceId: expense._id,
-//       referenceModel: "Expense",
-//     });
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Expense created successfully",
-//       data: expense,
-//     });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: error.message });
-//   }
-// };
 
 // @desc    Get all expenses for a user
 // @route   GET /api/expenses
@@ -99,7 +60,13 @@ exports.getExpenses = async (req, res) => {
     });
   }
 };
+
+
+// Make sure createNotification is imported
+
 // exports.createExpense = async (req, res) => {
+//   const session = await mongoose.startSession();
+
 //   try {
 //     const {
 //       description,
@@ -112,8 +79,18 @@ exports.getExpenses = async (req, res) => {
 //       userId,
 //     } = req.body;
 
-//     // validation...
-//     if (!description || !category || !amount || !user || !email || !userId) {
+//     // ============================================================
+//     // VALIDATION
+//     // ============================================================
+//     if (
+//       !description ||
+//       !category ||
+//       !amount ||
+//       !date ||
+//       !user ||
+//       !email ||
+//       !userId
+//     ) {
 //       return res.status(400).json({
 //         success: false,
 //         message: "Required fields are missing",
@@ -122,72 +99,238 @@ exports.getExpenses = async (req, res) => {
 
 //     const expenseAmount = Number(amount);
 
-//     if (isNaN(expenseAmount) || expenseAmount <= 0) {
+//     if (!Number.isFinite(expenseAmount) || expenseAmount <= 0) {
 //       return res.status(400).json({
 //         success: false,
-//         message: "Amount must be greater than 0",
+//         message: "Expense amount must be greater than 0",
 //       });
 //     }
 
-//     // 1. Create expense
-//     const expense = await Expense.create({
-//       description: description.trim(),
-//       category,
-//       type: type || "expense",
-//       amount: expenseAmount,
-//       date,
-//       user: user.trim(),
-//       userId,
-//       email: email.toLowerCase().trim(),
-//     });
+//     const normalizedEmail = email.toLowerCase().trim();
+//     const normalizedCategory = category.trim();
 
-//     // 2. Subtract expense from income/balance
-//     const income = await Income.findOneAndUpdate(
-//       { userId },
-//       {
-//         $inc: {
-//           balance: -expenseAmount,
-//         },
-//       },
-//       {
-//         new: true,
-//       }
-//     );
+//     // ============================================================
+//     // DATE
+//     // ============================================================
+//     const expenseDate = new Date(date);
 
-//     if (!income) {
-//       console.warn("⚠️ Income record not found for userId:", userId);
+//     if (isNaN(expenseDate.getTime())) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid expense date",
+//       });
 //     }
 
-//     // 3. Notification
+//     const budgetMonth = expenseDate.getMonth();
+//     const budgetYear = expenseDate.getFullYear();
+
+//     // ============================================================
+//     // START TRANSACTION
+//     // ============================================================
+//     session.startTransaction();
+
+//     // ============================================================
+//     // 1. FIND INCOME
+//     // ============================================================
+//     const income = await Income.findOne({
+//       userId,
+//     }).session(session);
+
+//     if (!income) {
+//       await session.abortTransaction();
+
+//       return res.status(404).json({
+//         success: false,
+//         message: "Income record not found",
+//       });
+//     }
+
+//     let incomeBalance = Number(income.balance) || 0;
+
+//     let remainingExpense = expenseAmount;
+//     let incomeUsed = 0;
+//     let savingsUsed = 0;
+
+//     // ============================================================
+//     // 2. USE INCOME FIRST
+//     // ============================================================
+//     if (incomeBalance > 0) {
+//       incomeUsed = Math.min(incomeBalance, remainingExpense);
+
+//       income.balance = incomeBalance - incomeUsed;
+
+//       await income.save({ session });
+
+//       remainingExpense -= incomeUsed;
+//     }
+
+//     // ============================================================
+//     // 3. USE SAVINGS ONLY AFTER INCOME REACHES ZERO
+//     // ============================================================
+//     if (remainingExpense > 0) {
+//       const savingsList = await Savings.find({
+//         email: normalizedEmail,
+//         currentAmount: { $gt: 0 },
+//       })
+//         .sort({ currentAmount: -1 })
+//         .session(session);
+
+//       for (const saving of savingsList) {
+//         if (remainingExpense <= 0) {
+//           break;
+//         }
+
+//         const availableSavings = Number(saving.currentAmount) || 0;
+
+//         if (availableSavings <= 0) {
+//           continue;
+//         }
+
+//         const amountFromSaving = Math.min(
+//           availableSavings,
+//           remainingExpense
+//         );
+
+//         saving.currentAmount -= amountFromSaving;
+
+//         if (saving.currentAmount < 0) {
+//           saving.currentAmount = 0;
+//         }
+
+//         // Your Savings pre-save middleware will
+//         // recalculate progress/isCompleted/completedDate.
+//         await saving.save({ session });
+
+//         savingsUsed += amountFromSaving;
+//         remainingExpense -= amountFromSaving;
+//       }
+//     }
+
+//     // ============================================================
+//     // 4. CHECK IF THERE IS ENOUGH MONEY
+//     // ============================================================
+//     if (remainingExpense > 0) {
+//       await session.abortTransaction();
+
+//       return res.status(400).json({
+//         success: false,
+//         message: "Insufficient income and savings to cover this expense",
+//         expenseAmount,
+//         incomeUsed,
+//         savingsUsed,
+//         remainingAmount: remainingExpense,
+//       });
+//     }
+
+//     // ============================================================
+//     // 5. CREATE EXPENSE
+//     // ============================================================
+//     const [expense] = await Expense.create(
+//       [
+//         {
+//           description: description.trim(),
+//           category: normalizedCategory,
+//           type: type || "expense",
+//           amount: expenseAmount,
+//           date: expenseDate,
+//           user: user.trim(),
+//           userId,
+//           email: normalizedEmail,
+//         },
+//       ],
+//       { session }
+//     );
+
+//     // ============================================================
+//     // 6. UPDATE BUDGET
+//     // ============================================================
+//     const budget = await Budget.findOne({
+//       email: normalizedEmail,
+//       category: normalizedCategory,
+//       month: budgetMonth,
+//       year: budgetYear,
+//     }).session(session);
+
+//     let budgetUpdated = false;
+
+//     if (budget) {
+//       budget.spentAmount =
+//         Number(budget.spentAmount || 0) + expenseAmount;
+
+//       await budget.save({ session });
+
+//       budgetUpdated = true;
+//     }
+
+//     // ============================================================
+//     // 7. CREATE NOTIFICATION
+//     // ============================================================
 //     await createNotification({
 //       userId,
-//       email,
+//       email: normalizedEmail,
 //       title: "💸 Expense Recorded",
-//       message: `You spent ${expenseAmount} on ${category}`,
+//       message: `You spent ${expenseAmount} on ${normalizedCategory}`,
 //       type: "info",
 //       referenceId: expense._id,
 //       referenceModel: "Expense",
 //     });
 
+//     // ============================================================
+//     // 8. COMMIT TRANSACTION
+//     // ============================================================
+//     await session.commitTransaction();
+
+//     // ============================================================
+//     // 9. RESPONSE
+//     // ============================================================
 //     return res.status(201).json({
 //       success: true,
 //       message: "Expense created successfully",
+
 //       data: expense,
-//       balance: income?.balance ?? null,
+
+//       moneyUsed: {
+//         expenseAmount,
+//         incomeUsed,
+//         savingsUsed,
+//       },
+
+//       remainingIncomeBalance: income.balance,
+
+//       budget: budgetUpdated
+//         ? {
+//             category: budget.category,
+//             allocatedAmount: budget.allocatedAmount,
+//             spentAmount: budget.spentAmount,
+//             remainingAmount: budget.remainingAmount,
+//             percentageUsed: budget.percentageUsed,
+//             status: budget.status,
+//           }
+//         : null,
 //     });
 //   } catch (error) {
+//     try {
+//       await session.abortTransaction();
+//     } catch (abortError) {
+//       console.error("❌ Transaction abort error:", abortError);
+//     }
+
 //     console.error("❌ Create expense error:", error);
 
 //     return res.status(500).json({
 //       success: false,
-//       message: error.message,
+//       message: "Failed to create expense",
+//       error: error.message,
 //     });
+//   } finally {
+//     session.endSession();
 //   }
 // };
 
-// Make sure createNotification is imported
-// const { createNotification } = require("../utils/notification");
 
+// ============================================================
+// CREATE EXPENSE
+// ============================================================
 exports.createExpense = async (req, res) => {
   const session = await mongoose.startSession();
 
@@ -204,7 +347,7 @@ exports.createExpense = async (req, res) => {
     } = req.body;
 
     // ============================================================
-    // VALIDATION
+    // 1. VALIDATION
     // ============================================================
     if (
       !description ||
@@ -230,11 +373,24 @@ exports.createExpense = async (req, res) => {
       });
     }
 
+    // ============================================================
+    // 2. NORMALIZE DATA
+    // ============================================================
     const normalizedEmail = email.toLowerCase().trim();
-    const normalizedCategory = category.trim();
+    const normalizedCategory = category.toLowerCase().trim();
 
     // ============================================================
-    // DATE
+    // 3. VALIDATE USER ID
+    // ============================================================
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId",
+      });
+    }
+
+    // ============================================================
+    // 4. VALIDATE DATE
     // ============================================================
     const expenseDate = new Date(date);
 
@@ -245,16 +401,23 @@ exports.createExpense = async (req, res) => {
       });
     }
 
+    // JavaScript:
+    // January = 0
+    // February = 1
+    // ...
+    // August = 7
+    // ...
+    // December = 11
     const budgetMonth = expenseDate.getMonth();
     const budgetYear = expenseDate.getFullYear();
 
     // ============================================================
-    // START TRANSACTION
+    // 5. START TRANSACTION
     // ============================================================
     session.startTransaction();
 
     // ============================================================
-    // 1. FIND INCOME
+    // 6. FIND USER'S INCOME
     // ============================================================
     const income = await Income.findOne({
       userId,
@@ -276,10 +439,13 @@ exports.createExpense = async (req, res) => {
     let savingsUsed = 0;
 
     // ============================================================
-    // 2. USE INCOME FIRST
+    // 7. USE INCOME FIRST
     // ============================================================
     if (incomeBalance > 0) {
-      incomeUsed = Math.min(incomeBalance, remainingExpense);
+      incomeUsed = Math.min(
+        incomeBalance,
+        remainingExpense
+      );
 
       income.balance = incomeBalance - incomeUsed;
 
@@ -289,7 +455,7 @@ exports.createExpense = async (req, res) => {
     }
 
     // ============================================================
-    // 3. USE SAVINGS ONLY AFTER INCOME REACHES ZERO
+    // 8. USE SAVINGS ONLY AFTER INCOME IS ZERO
     // ============================================================
     if (remainingExpense > 0) {
       const savingsList = await Savings.find({
@@ -304,7 +470,8 @@ exports.createExpense = async (req, res) => {
           break;
         }
 
-        const availableSavings = Number(saving.currentAmount) || 0;
+        const availableSavings =
+          Number(saving.currentAmount) || 0;
 
         if (availableSavings <= 0) {
           continue;
@@ -315,50 +482,62 @@ exports.createExpense = async (req, res) => {
           remainingExpense
         );
 
-        saving.currentAmount -= amountFromSaving;
+        saving.currentAmount =
+          availableSavings - amountFromSaving;
 
         if (saving.currentAmount < 0) {
           saving.currentAmount = 0;
         }
 
-        // Your Savings pre-save middleware will
-        // recalculate progress/isCompleted/completedDate.
         await saving.save({ session });
 
         savingsUsed += amountFromSaving;
+
         remainingExpense -= amountFromSaving;
       }
     }
 
     // ============================================================
-    // 4. CHECK IF THERE IS ENOUGH MONEY
+    // 9. CHECK AVAILABLE MONEY
     // ============================================================
     if (remainingExpense > 0) {
       await session.abortTransaction();
 
       return res.status(400).json({
         success: false,
-        message: "Insufficient income and savings to cover this expense",
+        message:
+          "Insufficient income and savings to cover this expense",
+
         expenseAmount,
+
         incomeUsed,
+
         savingsUsed,
+
         remainingAmount: remainingExpense,
       });
     }
 
     // ============================================================
-    // 5. CREATE EXPENSE
+    // 10. CREATE EXPENSE
     // ============================================================
     const [expense] = await Expense.create(
       [
         {
           description: description.trim(),
+
           category: normalizedCategory,
+
           type: type || "expense",
+
           amount: expenseAmount,
+
           date: expenseDate,
+
           user: user.trim(),
+
           userId,
+
           email: normalizedEmail,
         },
       ],
@@ -366,10 +545,19 @@ exports.createExpense = async (req, res) => {
     );
 
     // ============================================================
-    // 6. UPDATE BUDGET
+    // 11. FIND MATCHING BUDGET
+    //
+    // IMPORTANT:
+    // We DO NOT use email here.
+    //
+    // Budget must match:
+    // userId
+    // category
+    // month
+    // year
     // ============================================================
     const budget = await Budget.findOne({
-      email: normalizedEmail,
+      userId: userId,
       category: normalizedCategory,
       month: budgetMonth,
       year: budgetYear,
@@ -377,38 +565,58 @@ exports.createExpense = async (req, res) => {
 
     let budgetUpdated = false;
 
+    // ============================================================
+    // 12. UPDATE BUDGET
+    // ============================================================
     if (budget) {
       budget.spentAmount =
-        Number(budget.spentAmount || 0) + expenseAmount;
+        Number(budget.spentAmount || 0) +
+        expenseAmount;
 
+      /*
+       * budget.save() triggers your Budget
+       * pre("save") middleware.
+       *
+       * It automatically calculates:
+       *
+       * remainingAmount
+       * percentageUsed
+       * status
+       */
       await budget.save({ session });
 
       budgetUpdated = true;
     }
 
     // ============================================================
-    // 7. CREATE NOTIFICATION
+    // 13. CREATE NOTIFICATION
     // ============================================================
     await createNotification({
       userId,
       email: normalizedEmail,
+
       title: "💸 Expense Recorded",
+
       message: `You spent ${expenseAmount} on ${normalizedCategory}`,
+
       type: "info",
+
       referenceId: expense._id,
+
       referenceModel: "Expense",
     });
 
     // ============================================================
-    // 8. COMMIT TRANSACTION
+    // 14. COMMIT TRANSACTION
     // ============================================================
     await session.commitTransaction();
 
     // ============================================================
-    // 9. RESPONSE
+    // 15. RESPONSE
     // ============================================================
     return res.status(201).json({
       success: true,
+
       message: "Expense created successfully",
 
       data: expense,
@@ -421,25 +629,51 @@ exports.createExpense = async (req, res) => {
 
       remainingIncomeBalance: income.balance,
 
+      budgetUpdated,
+
       budget: budgetUpdated
         ? {
+            id: budget._id,
+
             category: budget.category,
-            allocatedAmount: budget.allocatedAmount,
-            spentAmount: budget.spentAmount,
-            remainingAmount: budget.remainingAmount,
-            percentageUsed: budget.percentageUsed,
+
+            month: budget.month,
+
+            year: budget.year,
+
+            allocatedAmount:
+              budget.allocatedAmount,
+
+            spentAmount:
+              budget.spentAmount,
+
+            remainingAmount:
+              budget.remainingAmount,
+
+            percentageUsed:
+              budget.percentageUsed,
+
             status: budget.status,
           }
         : null,
     });
   } catch (error) {
+    // ============================================================
+    // ROLLBACK TRANSACTION
+    // ============================================================
     try {
       await session.abortTransaction();
     } catch (abortError) {
-      console.error("❌ Transaction abort error:", abortError);
+      console.error(
+        "❌ Transaction abort error:",
+        abortError
+      );
     }
 
-    console.error("❌ Create expense error:", error);
+    console.error(
+      "❌ Create expense error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -447,9 +681,13 @@ exports.createExpense = async (req, res) => {
       error: error.message,
     });
   } finally {
-    session.endSession();
+    // ============================================================
+    // END SESSION
+    // ============================================================
+    await session.endSession();
   }
 };
+
 
 exports.getAllExpenses = async (req, res) => {
   try {
