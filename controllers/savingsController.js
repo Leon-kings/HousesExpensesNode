@@ -347,15 +347,815 @@
 
 
 
+// // ============================================================
+// // CONTROLLERS / SAVINGS.CONTROLLER.JS
+// // ============================================================
+
+// const Savings = require("../models/Savings");
+// const createNotification = require("../utils/createNotification");
+
+// // ============================================================
+// // GET ALL SAVINGS
+// // ============================================================
+
+// exports.getSavings = async (req, res) => {
+//   try {
+//     const {
+//       category,
+//       isCompleted,
+//       userId,
+//       email,
+//     } = req.query;
+
+//     // ========================================================
+//     // BUILD QUERY
+//     // ========================================================
+
+//     const query = {};
+
+//     // Primary ownership
+//     if (userId) {
+//       query.userId = userId;
+//     } else if (email) {
+//       // Compatibility fallback
+//       query.email = email.trim().toLowerCase();
+//     }
+
+//     // Category filter
+//     if (
+//       category &&
+//       category.toLowerCase() !== "all"
+//     ) {
+//       query.category = category.trim();
+//     }
+
+//     // Completion filter
+//     if (isCompleted !== undefined) {
+//       query.isCompleted =
+//         isCompleted === "true";
+//     }
+
+//     // ========================================================
+//     // FETCH SAVINGS
+//     // ========================================================
+
+//     const savings = await Savings.find(query).sort({
+//       priority: -1,
+//       createdAt: -1,
+//     });
+
+//     // ========================================================
+//     // SUMMARY
+//     // ========================================================
+
+//     const totalTarget = savings.reduce(
+//       (sum, item) =>
+//         sum + (Number(item.targetAmount) || 0),
+//       0
+//     );
+
+//     const totalCurrent = savings.reduce(
+//       (sum, item) =>
+//         sum + (Number(item.currentAmount) || 0),
+//       0
+//     );
+
+//     const overallProgress =
+//       totalTarget > 0
+//         ? Math.min(
+//             100,
+//             (totalCurrent / totalTarget) * 100
+//           )
+//         : 0;
+
+//     const completedCount =
+//       savings.filter(
+//         (item) => item.isCompleted
+//       ).length;
+
+//     const inProgressCount =
+//       savings.filter(
+//         (item) => !item.isCompleted
+//       ).length;
+
+//     return res.status(200).json({
+//       success: true,
+
+//       count: savings.length,
+
+//       data: savings,
+
+//       summary: {
+//         totalTarget,
+
+//         totalCurrent,
+
+//         overallProgress: Number(
+//           overallProgress.toFixed(2)
+//         ),
+
+//         completedCount,
+
+//         inProgressCount,
+//       },
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Get savings error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+
+//       message:
+//         "Failed to fetch savings goals",
+
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // CREATE SAVINGS
+// // ============================================================
+
+
+// exports.createSavings = async (req, res) => {
+//   try {
+//     const {
+//       category,
+//       targetAmount,
+//       currentAmount,
+//       deadline,
+//       description,
+//       priority,
+//       email,
+//       userId,
+//     } = req.body;
+
+//     // ========================================================
+//     // VALIDATION
+//     // ========================================================
+
+//     if (!category || !targetAmount || !email || !userId) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Category, target amount, email, and userId are required",
+//       });
+//     }
+
+//     if (!mongoose.Types.ObjectId.isValid(userId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid userId",
+//       });
+//     }
+
+//     const numericTarget = Number(targetAmount);
+//     const numericCurrent = Number(currentAmount) || 0;
+
+//     if (
+//       !Number.isFinite(numericTarget) ||
+//       numericTarget <= 0
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Target amount must be greater than zero",
+//       });
+//     }
+
+//     if (
+//       !Number.isFinite(numericCurrent) ||
+//       numericCurrent < 0
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Current amount cannot be negative",
+//       });
+//     }
+
+//     if (numericCurrent > numericTarget) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Current savings cannot exceed the target amount",
+//       });
+//     }
+
+//     const normalizedEmail = email.trim().toLowerCase();
+
+//     // ========================================================
+//     // CREATE SAVINGS
+//     // ========================================================
+
+//     const savings = await Savings.create({
+//       category: category.trim(),
+
+//       targetAmount: numericTarget,
+
+//       currentAmount: numericCurrent,
+
+//       deadline: deadline || null,
+
+//       description: description
+//         ? description.trim()
+//         : "",
+
+//       priority: priority || "medium",
+
+//       email: normalizedEmail,
+
+//       // IMPORTANT
+//       userId,
+//     });
+
+//     // ========================================================
+//     // NOTIFICATION TYPE
+//     // ========================================================
+
+//     let type = "system";
+//     let severity = "low";
+
+//     if (priority === "high") {
+//       type = "warning";
+//       severity = "medium";
+//     }
+
+//     if (priority === "critical") {
+//       type = "alert";
+//       severity = "high";
+//     }
+
+//     // ========================================================
+//     // CREATE NOTIFICATION
+//     // ========================================================
+
+//     await createNotification({
+//       userId,
+//       email: normalizedEmail,
+
+//       title: "🎯 Savings Goal Created",
+
+//       message:
+//         `You created a savings goal of RWF ` +
+//         `${numericTarget.toLocaleString()} ` +
+//         `for ${category}.`,
+
+//       type,
+
+//       severity,
+
+//       referenceId: savings._id,
+
+//       referenceModel: "Savings",
+//     });
+
+//     // ========================================================
+//     // RESPONSE
+//     // ========================================================
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Savings goal created successfully",
+//       data: savings,
+//     });
+//   } catch (error) {
+//     console.error("Create savings error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to create savings goal",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // GET SAVINGS BY EMAIL
+// // ============================================================
+
+// exports.getSavingsByEmail = async (
+//   req,
+//   res
+// ) => {
+//   try {
+//     const { email } = req.params;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is required",
+//       });
+//     }
+
+//     const normalizedEmail =
+//       email.trim().toLowerCase();
+
+//     const savings =
+//       await Savings.find({
+//         email: normalizedEmail,
+//       }).sort({
+//         createdAt: -1,
+//       });
+
+//     return res.status(200).json({
+//       success: true,
+
+//       count: savings.length,
+
+//       data: savings,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Get savings by email error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+
+//       message:
+//         "Failed to retrieve savings goals",
+
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // GET SAVINGS BY USER ID
+// // ============================================================
+
+// exports.getSavingsByUserId = async (
+//   req,
+//   res
+// ) => {
+//   try {
+//     const { userId } = req.params;
+
+//     const mongoose = require("mongoose");
+
+//     if (
+//       !mongoose.Types.ObjectId.isValid(userId)
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid userId",
+//       });
+//     }
+
+//     const savings =
+//       await Savings.find({
+//         userId,
+//       }).sort({
+//         priority: -1,
+//         createdAt: -1,
+//       });
+
+//     return res.status(200).json({
+//       success: true,
+
+//       count: savings.length,
+
+//       data: savings,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Get savings by userId error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+
+//       message:
+//         "Failed to retrieve savings goals",
+
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // UPDATE SAVINGS
+// // ============================================================
+
+// exports.updateSavings = async (
+//   req,
+//   res
+// ) => {
+//   try {
+//     const savings =
+//       await Savings.findById(
+//         req.params.id
+//       );
+
+//     if (!savings) {
+//       return res.status(404).json({
+//         success: false,
+//         message:
+//           "Savings goal not found",
+//       });
+//     }
+
+//     // ========================================================
+//     // SAVE OLD VALUES
+//     // ========================================================
+
+//     const oldProgress =
+//       Number(savings.progress) || 0;
+
+//     const oldCompleted =
+//       savings.isCompleted;
+
+//     // ========================================================
+//     // UPDATE ONLY ALLOWED FIELDS
+//     // ========================================================
+
+//     const {
+//       category,
+//       targetAmount,
+//       currentAmount,
+//       deadline,
+//       description,
+//       priority,
+//     } = req.body;
+
+//     if (category !== undefined) {
+//       const normalizedCategory =
+//         String(category).trim();
+
+//       if (!normalizedCategory) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Category cannot be empty",
+//         });
+//       }
+
+//       savings.category =
+//         normalizedCategory;
+//     }
+
+//     if (targetAmount !== undefined) {
+//       const newTarget =
+//         Number(targetAmount);
+
+//       if (
+//         !Number.isFinite(newTarget) ||
+//         newTarget <= 0
+//       ) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Target amount must be greater than zero",
+//         });
+//       }
+
+//       savings.targetAmount =
+//         newTarget;
+//     }
+
+//     if (currentAmount !== undefined) {
+//       const newCurrent =
+//         Number(currentAmount);
+
+//       if (
+//         !Number.isFinite(newCurrent) ||
+//         newCurrent < 0
+//       ) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Current amount must be zero or greater",
+//         });
+//       }
+
+//       savings.currentAmount =
+//         newCurrent;
+//     }
+
+//     if (deadline !== undefined) {
+//       savings.deadline =
+//         deadline || null;
+//     }
+
+//     if (description !== undefined) {
+//       savings.description =
+//         String(description).trim();
+//     }
+
+//     if (priority !== undefined) {
+//       const validPriorities = [
+//         "low",
+//         "medium",
+//         "high",
+//         "critical",
+//       ];
+
+//       if (
+//         !validPriorities.includes(
+//           priority
+//         )
+//       ) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Invalid savings priority",
+//         });
+//       }
+
+//       savings.priority =
+//         priority;
+//     }
+
+//     // ========================================================
+//     // IMPORTANT
+//     //
+//     // Use .save() so the Savings model's
+//     // pre-save hook recalculates:
+//     //
+//     // progress
+//     // isCompleted
+//     // completedDate
+//     // currentAmount safety
+//     // ========================================================
+
+//     await savings.save();
+
+//     // ========================================================
+//     // MILESTONE NOTIFICATIONS
+//     // ========================================================
+
+//     let milestoneNotification =
+//       null;
+
+//     // 25% milestone
+//     if (
+//       savings.progress >= 25 &&
+//       oldProgress < 25
+//     ) {
+//       milestoneNotification =
+//         await createNotification({
+//           userEmail: savings.email,
+
+//           userId: savings.userId,
+
+//           title:
+//             "🏆 Savings Milestone",
+
+//           message:
+//             `You reached 25% of your ` +
+//             `${savings.category} savings goal.`,
+
+//           type: "savings",
+
+//           severity: "medium",
+
+//           relatedId: savings._id,
+
+//           relatedType: "Savings",
+
+//           actionLink:
+//             `/savings/${savings._id}`,
+
+//           metadata: {
+//             savingsId: savings._id,
+
+//             category:
+//               savings.category,
+
+//             progress:
+//               savings.progress,
+
+//             currentAmount:
+//               savings.currentAmount,
+
+//             targetAmount:
+//               savings.targetAmount,
+//           },
+//         });
+//     }
+
+//     // 100% completion
+//     if (
+//       savings.progress >= 100 &&
+//       oldProgress < 100
+//     ) {
+//       milestoneNotification =
+//         await createNotification({
+//           userEmail: savings.email,
+
+//           userId: savings.userId,
+
+//           title:
+//             "🎉 Savings Goal Completed",
+
+//           message:
+//             `Congratulations! You completed ` +
+//             `your ${savings.category} savings goal.`,
+
+//           type: "savings",
+
+//           severity: "high",
+
+//           relatedId: savings._id,
+
+//           relatedType: "Savings",
+
+//           actionLink:
+//             `/savings/${savings._id}`,
+
+//           metadata: {
+//             savingsId: savings._id,
+
+//             category:
+//               savings.category,
+
+//             progress: 100,
+
+//             currentAmount:
+//               savings.currentAmount,
+
+//             targetAmount:
+//               savings.targetAmount,
+
+//             completed:
+//               savings.isCompleted,
+//           },
+//         });
+//     }
+
+//     // ========================================================
+//     // RESPONSE
+//     // ========================================================
+
+//     return res.status(200).json({
+//       success: true,
+
+//       message:
+//         "Savings updated successfully",
+
+//       data: savings,
+
+//       notification:
+//         milestoneNotification,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Update savings error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+
+//       message:
+//         "Failed to update savings goal",
+
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // DELETE SAVINGS
+// // ============================================================
+
+// exports.deleteSavings = async (
+//   req,
+//   res
+// ) => {
+//   try {
+//     const savings =
+//       await Savings.findById(
+//         req.params.id
+//       );
+
+//     if (!savings) {
+//       return res.status(404).json({
+//         success: false,
+//         message:
+//           "Savings goal not found",
+//       });
+//     }
+
+//     // ========================================================
+//     // DELETE SAVINGS
+//     // ========================================================
+
+//     await savings.deleteOne();
+
+//     // ========================================================
+//     // DELETE NOTIFICATION
+//     // IS NOT DONE HERE
+//     //
+//     // The notification is historical.
+//     // ========================================================
+
+//     const notification =
+//       await createNotification({
+//         userEmail: savings.email,
+
+//         userId: savings.userId,
+
+//         title:
+//           "🗑️ Savings Goal Deleted",
+
+//         message:
+//           `Your ${savings.category} ` +
+//           `savings goal was deleted.`,
+
+//         type: "savings",
+
+//         severity: "medium",
+
+//         relatedId: savings._id,
+
+//         relatedType: "Savings",
+
+//         actionLink:
+//           "/savings",
+
+//         metadata: {
+//           savingsId: savings._id,
+
+//           category:
+//             savings.category,
+
+//           targetAmount:
+//             savings.targetAmount,
+
+//           currentAmount:
+//             savings.currentAmount,
+//         },
+//       });
+
+//     return res.status(200).json({
+//       success: true,
+
+//       message:
+//         "Savings deleted successfully",
+
+//       notification,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Delete savings error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+
+//       message:
+//         "Failed to delete savings goal",
+
+//       error: error.message,
+//     });
+//   }
+// };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ============================================================
 // CONTROLLERS / SAVINGS.CONTROLLER.JS
 // ============================================================
+
+const mongoose = require("mongoose");
 
 const Savings = require("../models/Savings");
 const createNotification = require("../utils/createNotification");
 
 // ============================================================
 // GET ALL SAVINGS
+// ============================================================
+// Supports:
+// ?userId=...
+// ?email=...
+// ?category=...
+// ?isCompleted=true/false
 // ============================================================
 
 exports.getSavings = async (req, res) => {
@@ -373,15 +1173,35 @@ exports.getSavings = async (req, res) => {
 
     const query = {};
 
-    // Primary ownership
+    // --------------------------------------------------------
+    // USER ID
+    // --------------------------------------------------------
+
     if (userId) {
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid userId",
+        });
+      }
+
       query.userId = userId;
-    } else if (email) {
-      // Compatibility fallback
-      query.email = email.trim().toLowerCase();
     }
 
-    // Category filter
+    // --------------------------------------------------------
+    // EMAIL FALLBACK
+    // --------------------------------------------------------
+
+    else if (email) {
+      query.email = String(email)
+        .trim()
+        .toLowerCase();
+    }
+
+    // --------------------------------------------------------
+    // CATEGORY
+    // --------------------------------------------------------
+
     if (
       category &&
       category.toLowerCase() !== "all"
@@ -389,8 +1209,22 @@ exports.getSavings = async (req, res) => {
       query.category = category.trim();
     }
 
-    // Completion filter
+    // --------------------------------------------------------
+    // COMPLETION FILTER
+    // --------------------------------------------------------
+
     if (isCompleted !== undefined) {
+      if (
+        isCompleted !== "true" &&
+        isCompleted !== "false"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "isCompleted must be true or false",
+        });
+      }
+
       query.isCompleted =
         isCompleted === "true";
     }
@@ -438,6 +1272,10 @@ exports.getSavings = async (req, res) => {
         (item) => !item.isCompleted
       ).length;
 
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
     return res.status(200).json({
       success: true,
 
@@ -477,209 +1315,55 @@ exports.getSavings = async (req, res) => {
 };
 
 // ============================================================
-// CREATE SAVINGS
+// GET SINGLE SAVINGS GOAL
 // ============================================================
 
-// exports.createSavings = async (req, res) => {
-//   try {
-//     const {
-//       category,
-//       targetAmount,
-//       currentAmount,
-//       deadline,
-//       description,
-//       priority,
-//       email,
-//       userId,
-//     } = req.body;
+exports.getSavingsById = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-//     // ========================================================
-//     // VALIDATION
-//     // ========================================================
+    if (
+      !mongoose.Types.ObjectId.isValid(id)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid savings ID",
+      });
+    }
 
-//     if (
-//       !category ||
-//       targetAmount === undefined ||
-//       !email ||
-//       !userId
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Category, target amount, email, and userId are required",
-//       });
-//     }
+    const savings =
+      await Savings.findById(id);
 
-//     // Validate userId
-//     const mongoose = require("mongoose");
+    if (!savings) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Savings goal not found",
+      });
+    }
 
-//     if (
-//       !mongoose.Types.ObjectId.isValid(userId)
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid userId",
-//       });
-//     }
+    return res.status(200).json({
+      success: true,
+      data: savings,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Get savings by ID error:",
+      error
+    );
 
-//     const normalizedCategory =
-//       category.trim();
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to fetch savings goal",
+      error: error.message,
+    });
+  }
+};
 
-//     const normalizedEmail =
-//       email.trim().toLowerCase();
-
-//     const amount = Number(targetAmount);
-
-//     const initialAmount =
-//       currentAmount === undefined
-//         ? 0
-//         : Number(currentAmount);
-
-//     // Target validation
-//     if (
-//       !Number.isFinite(amount) ||
-//       amount <= 0
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Target amount must be greater than zero",
-//       });
-//     }
-
-//     // Current amount validation
-//     if (
-//       !Number.isFinite(initialAmount) ||
-//       initialAmount < 0
-//     ) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Current amount must be a valid number greater than or equal to zero",
-//       });
-//     }
-
-//     // ========================================================
-//     // CREATE SAVINGS
-//     // ========================================================
-
-//     const savings =
-//       await Savings.create({
-//         category: normalizedCategory,
-
-//         targetAmount: amount,
-
-//         currentAmount: Math.min(
-//           initialAmount,
-//           amount
-//         ),
-
-//         deadline:
-//           deadline || null,
-
-//         description:
-//           description?.trim() || "",
-
-//         priority:
-//           priority || "medium",
-
-//         email: normalizedEmail,
-
-//         userId,
-//       });
-
-//     // ========================================================
-//     // PRIORITY → NOTIFICATION SEVERITY
-//     // ========================================================
-
-//     let severity = "low";
-
-//     if (savings.priority === "high") {
-//       severity = "medium";
-//     }
-
-//     if (savings.priority === "critical") {
-//       severity = "high";
-//     }
-
-//     // ========================================================
-//     // CREATE NOTIFICATION
-//     // ========================================================
-
-//     const notification =
-//       await createNotification({
-//         userEmail: normalizedEmail,
-
-//         userId,
-
-//         title:
-//           "🎯 Savings Goal Created",
-
-//         message:
-//           `You created a savings goal of RWF ` +
-//           `${amount.toLocaleString()} ` +
-//           `for ${normalizedCategory}.`,
-
-//         type: "savings",
-
-//         severity,
-
-//         relatedId: savings._id,
-
-//         relatedType: "Savings",
-
-//         actionLink:
-//           `/savings/${savings._id}`,
-
-//         metadata: {
-//           savingsId: savings._id,
-
-//           category:
-//             normalizedCategory,
-
-//           targetAmount: amount,
-
-//           currentAmount:
-//             savings.currentAmount,
-
-//           progress:
-//             savings.progress,
-
-//           priority:
-//             savings.priority,
-//         },
-//       });
-
-//     // ========================================================
-//     // RESPONSE
-//     // ========================================================
-
-//     return res.status(201).json({
-//       success: true,
-
-//       message:
-//         "Savings goal created successfully",
-
-//       data: savings,
-
-//       notification,
-//     });
-//   } catch (error) {
-//     console.error(
-//       "❌ Create savings error:",
-//       error
-//     );
-
-//     return res.status(500).json({
-//       success: false,
-
-//       message:
-//         "Failed to create savings goal",
-
-//       error: error.message,
-//     });
-//   }
-// };
+// ============================================================
+// CREATE SAVINGS
+// ============================================================
 
 exports.createSavings = async (req, res) => {
   try {
@@ -698,7 +1382,12 @@ exports.createSavings = async (req, res) => {
     // VALIDATION
     // ========================================================
 
-    if (!category || !targetAmount || !email || !userId) {
+    if (
+      !category ||
+      targetAmount === undefined ||
+      !email ||
+      !userId
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -706,15 +1395,25 @@ exports.createSavings = async (req, res) => {
       });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+    // --------------------------------------------------------
+    // USER ID
+    // --------------------------------------------------------
+
+    if (
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
       return res.status(400).json({
         success: false,
         message: "Invalid userId",
       });
     }
 
-    const numericTarget = Number(targetAmount);
-    const numericCurrent = Number(currentAmount) || 0;
+    // --------------------------------------------------------
+    // TARGET
+    // --------------------------------------------------------
+
+    const numericTarget =
+      Number(targetAmount);
 
     if (
       !Number.isFinite(numericTarget) ||
@@ -722,9 +1421,19 @@ exports.createSavings = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Target amount must be greater than zero",
+        message:
+          "Target amount must be greater than zero",
       });
     }
+
+    // --------------------------------------------------------
+    // CURRENT
+    // --------------------------------------------------------
+
+    const numericCurrent =
+      currentAmount === undefined
+        ? 0
+        : Number(currentAmount);
 
     if (
       !Number.isFinite(numericCurrent) ||
@@ -732,11 +1441,14 @@ exports.createSavings = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Current amount cannot be negative",
+        message:
+          "Current amount cannot be negative",
       });
     }
 
-    if (numericCurrent > numericTarget) {
+    if (
+      numericCurrent > numericTarget
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -744,73 +1456,175 @@ exports.createSavings = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    // --------------------------------------------------------
+    // EMAIL
+    // --------------------------------------------------------
+
+    const normalizedEmail = String(email)
+      .trim()
+      .toLowerCase();
+
+    // ========================================================
+    // DEADLINE VALIDATION
+    // ========================================================
+
+    let normalizedDeadline = null;
+
+    if (deadline) {
+      const parsedDeadline =
+        new Date(deadline);
+
+      if (
+        Number.isNaN(
+          parsedDeadline.getTime()
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid savings deadline",
+        });
+      }
+
+      normalizedDeadline =
+        parsedDeadline;
+    }
+
+    // ========================================================
+    // PRIORITY
+    // ========================================================
+
+    const validPriorities = [
+      "low",
+      "medium",
+      "high",
+      "critical",
+    ];
+
+    const normalizedPriority =
+      priority || "medium";
+
+    if (
+      !validPriorities.includes(
+        normalizedPriority
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid savings priority",
+      });
+    }
 
     // ========================================================
     // CREATE SAVINGS
     // ========================================================
 
-    const savings = await Savings.create({
-      category: category.trim(),
+    const savings =
+      await Savings.create({
+        category: category.trim(),
 
-      targetAmount: numericTarget,
+        targetAmount:
+          numericTarget,
 
-      currentAmount: numericCurrent,
+        currentAmount:
+          numericCurrent,
 
-      deadline: deadline || null,
+        deadline:
+          normalizedDeadline,
 
-      description: description
-        ? description.trim()
-        : "",
+        description: description
+          ? String(description).trim()
+          : "",
 
-      priority: priority || "medium",
+        priority:
+          normalizedPriority,
 
-      email: normalizedEmail,
+        email:
+          normalizedEmail,
 
-      // IMPORTANT
-      userId,
-    });
+        userId,
+      });
 
     // ========================================================
-    // NOTIFICATION TYPE
+    // NOTIFICATION
+    // ========================================================
+    //
+    // Notification.js supports:
+    // info
+    // warning
+    // alert
+    //
+    // Therefore DO NOT use:
+    // type: "savings"
     // ========================================================
 
-    let type = "system";
+    let notificationType = "info";
     let severity = "low";
 
-    if (priority === "high") {
-      type = "warning";
+    if (
+      normalizedPriority === "high"
+    ) {
+      notificationType = "warning";
       severity = "medium";
     }
 
-    if (priority === "critical") {
-      type = "alert";
+    if (
+      normalizedPriority === "critical"
+    ) {
+      notificationType = "alert";
       severity = "high";
     }
 
-    // ========================================================
-    // CREATE NOTIFICATION
-    // ========================================================
+    const notification =
+      await createNotification({
+        userEmail:
+          normalizedEmail,
 
-    await createNotification({
-      userId,
-      email: normalizedEmail,
+        userId,
 
-      title: "🎯 Savings Goal Created",
+        title:
+          "🎯 Savings Goal Created",
 
-      message:
-        `You created a savings goal of RWF ` +
-        `${numericTarget.toLocaleString()} ` +
-        `for ${category}.`,
+        message:
+          `You created a savings goal of RWF ` +
+          `${numericTarget.toLocaleString()} ` +
+          `for ${savings.category}.`,
 
-      type,
+        type:
+          notificationType,
 
-      severity,
+        severity,
 
-      referenceId: savings._id,
+        relatedId:
+          savings._id,
 
-      referenceModel: "Savings",
-    });
+        relatedType:
+          "Savings",
+
+        actionLink:
+          `/savings/${savings._id}`,
+
+        metadata: {
+          savingsId:
+            savings._id,
+
+          category:
+            savings.category,
+
+          targetAmount:
+            savings.targetAmount,
+
+          currentAmount:
+            savings.currentAmount,
+
+          progress:
+            savings.progress,
+
+          priority:
+            savings.priority,
+        },
+      });
 
     // ========================================================
     // RESPONSE
@@ -818,15 +1632,41 @@ exports.createSavings = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Savings goal created successfully",
+
+      message:
+        "Savings goal created successfully",
+
       data: savings,
+
+      notification,
     });
   } catch (error) {
-    console.error("Create savings error:", error);
+    console.error(
+      "❌ Create savings error:",
+      error
+    );
+
+    if (
+      error.name === "ValidationError"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Savings validation failed",
+        errors: Object.values(
+          error.errors
+        ).map(
+          (err) => err.message
+        ),
+      });
+    }
 
     return res.status(500).json({
       success: false,
-      message: "Failed to create savings goal",
+
+      message:
+        "Failed to create savings goal",
+
       error: error.message,
     });
   }
@@ -846,22 +1686,29 @@ exports.getSavingsByEmail = async (
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: "Email is required",
+        message:
+          "Email is required",
       });
     }
 
     const normalizedEmail =
-      email.trim().toLowerCase();
+      String(email)
+        .trim()
+        .toLowerCase();
 
     const savings =
       await Savings.find({
         email: normalizedEmail,
       }).sort({
+        priority: -1,
         createdAt: -1,
       });
 
     return res.status(200).json({
       success: true,
+
+      message:
+        "Savings goals retrieved successfully",
 
       count: savings.length,
 
@@ -895,14 +1742,16 @@ exports.getSavingsByUserId = async (
   try {
     const { userId } = req.params;
 
-    const mongoose = require("mongoose");
-
     if (
-      !mongoose.Types.ObjectId.isValid(userId)
+      !userId ||
+      !mongoose.Types.ObjectId.isValid(
+        userId
+      )
     ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid userId",
+        message:
+          "Invalid userId",
       });
     }
 
@@ -916,6 +1765,9 @@ exports.getSavingsByUserId = async (
 
     return res.status(200).json({
       success: true,
+
+      message:
+        "Savings goals retrieved successfully",
 
       count: savings.length,
 
@@ -947,10 +1799,20 @@ exports.updateSavings = async (
   res
 ) => {
   try {
+    const { id } = req.params;
+
+    if (
+      !mongoose.Types.ObjectId.isValid(id)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid savings ID",
+      });
+    }
+
     const savings =
-      await Savings.findById(
-        req.params.id
-      );
+      await Savings.findById(id);
 
     if (!savings) {
       return res.status(404).json({
@@ -971,7 +1833,7 @@ exports.updateSavings = async (
       savings.isCompleted;
 
     // ========================================================
-    // UPDATE ONLY ALLOWED FIELDS
+    // UPDATE ALLOWED FIELDS ONLY
     // ========================================================
 
     const {
@@ -983,7 +1845,13 @@ exports.updateSavings = async (
       priority,
     } = req.body;
 
-    if (category !== undefined) {
+    // --------------------------------------------------------
+    // CATEGORY
+    // --------------------------------------------------------
+
+    if (
+      category !== undefined
+    ) {
       const normalizedCategory =
         String(category).trim();
 
@@ -999,12 +1867,20 @@ exports.updateSavings = async (
         normalizedCategory;
     }
 
-    if (targetAmount !== undefined) {
+    // --------------------------------------------------------
+    // TARGET
+    // --------------------------------------------------------
+
+    if (
+      targetAmount !== undefined
+    ) {
       const newTarget =
         Number(targetAmount);
 
       if (
-        !Number.isFinite(newTarget) ||
+        !Number.isFinite(
+          newTarget
+        ) ||
         newTarget <= 0
       ) {
         return res.status(400).json({
@@ -1018,12 +1894,20 @@ exports.updateSavings = async (
         newTarget;
     }
 
-    if (currentAmount !== undefined) {
+    // --------------------------------------------------------
+    // CURRENT AMOUNT
+    // --------------------------------------------------------
+
+    if (
+      currentAmount !== undefined
+    ) {
       const newCurrent =
         Number(currentAmount);
 
       if (
-        !Number.isFinite(newCurrent) ||
+        !Number.isFinite(
+          newCurrent
+        ) ||
         newCurrent < 0
       ) {
         return res.status(400).json({
@@ -1037,17 +1921,54 @@ exports.updateSavings = async (
         newCurrent;
     }
 
-    if (deadline !== undefined) {
-      savings.deadline =
-        deadline || null;
+    // --------------------------------------------------------
+    // DEADLINE
+    // --------------------------------------------------------
+
+    if (
+      deadline !== undefined
+    ) {
+      if (!deadline) {
+        savings.deadline = null;
+      } else {
+        const parsedDeadline =
+          new Date(deadline);
+
+        if (
+          Number.isNaN(
+            parsedDeadline.getTime()
+          )
+        ) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Invalid savings deadline",
+          });
+        }
+
+        savings.deadline =
+          parsedDeadline;
+      }
     }
 
-    if (description !== undefined) {
+    // --------------------------------------------------------
+    // DESCRIPTION
+    // --------------------------------------------------------
+
+    if (
+      description !== undefined
+    ) {
       savings.description =
         String(description).trim();
     }
 
-    if (priority !== undefined) {
+    // --------------------------------------------------------
+    // PRIORITY
+    // --------------------------------------------------------
+
+    if (
+      priority !== undefined
+    ) {
       const validPriorities = [
         "low",
         "medium",
@@ -1072,83 +1993,41 @@ exports.updateSavings = async (
     }
 
     // ========================================================
-    // IMPORTANT
+    // SAVE
+    // ========================================================
     //
-    // Use .save() so the Savings model's
-    // pre-save hook recalculates:
+    // This triggers Savings.pre("save"):
     //
-    // progress
-    // isCompleted
-    // completedDate
-    // currentAmount safety
+    // - progress
+    // - isCompleted
+    // - completedDate
+    // - currentAmount protection
+    //
     // ========================================================
 
     await savings.save();
 
     // ========================================================
-    // MILESTONE NOTIFICATIONS
+    // NOTIFICATION
     // ========================================================
 
-    let milestoneNotification =
-      null;
+    let notification = null;
 
-    // 25% milestone
-    if (
-      savings.progress >= 25 &&
-      oldProgress < 25
-    ) {
-      milestoneNotification =
-        await createNotification({
-          userEmail: savings.email,
+    // --------------------------------------------------------
+    // 100% COMPLETION
+    // --------------------------------------------------------
 
-          userId: savings.userId,
-
-          title:
-            "🏆 Savings Milestone",
-
-          message:
-            `You reached 25% of your ` +
-            `${savings.category} savings goal.`,
-
-          type: "savings",
-
-          severity: "medium",
-
-          relatedId: savings._id,
-
-          relatedType: "Savings",
-
-          actionLink:
-            `/savings/${savings._id}`,
-
-          metadata: {
-            savingsId: savings._id,
-
-            category:
-              savings.category,
-
-            progress:
-              savings.progress,
-
-            currentAmount:
-              savings.currentAmount,
-
-            targetAmount:
-              savings.targetAmount,
-          },
-        });
-    }
-
-    // 100% completion
     if (
       savings.progress >= 100 &&
       oldProgress < 100
     ) {
-      milestoneNotification =
+      notification =
         await createNotification({
-          userEmail: savings.email,
+          userEmail:
+            savings.email,
 
-          userId: savings.userId,
+          userId:
+            savings.userId,
 
           title:
             "🎉 Savings Goal Completed",
@@ -1157,19 +2036,24 @@ exports.updateSavings = async (
             `Congratulations! You completed ` +
             `your ${savings.category} savings goal.`,
 
-          type: "savings",
+          type:
+            "alert",
 
-          severity: "high",
+          severity:
+            "high",
 
-          relatedId: savings._id,
+          relatedId:
+            savings._id,
 
-          relatedType: "Savings",
+          relatedType:
+            "Savings",
 
           actionLink:
             `/savings/${savings._id}`,
 
           metadata: {
-            savingsId: savings._id,
+            savingsId:
+              savings._id,
 
             category:
               savings.category,
@@ -1188,6 +2072,126 @@ exports.updateSavings = async (
         });
     }
 
+    // --------------------------------------------------------
+    // 25% MILESTONE
+    // --------------------------------------------------------
+    //
+    // Only create this if the 100% notification
+    // was not already created.
+    // --------------------------------------------------------
+
+    else if (
+      savings.progress >= 25 &&
+      oldProgress < 25
+    ) {
+      notification =
+        await createNotification({
+          userEmail:
+            savings.email,
+
+          userId:
+            savings.userId,
+
+          title:
+            "🏆 Savings Milestone",
+
+          message:
+            `You reached 25% of your ` +
+            `${savings.category} savings goal.`,
+
+          type:
+            "warning",
+
+          severity:
+            "medium",
+
+          relatedId:
+            savings._id,
+
+          relatedType:
+            "Savings",
+
+          actionLink:
+            `/savings/${savings._id}`,
+
+          metadata: {
+            savingsId:
+              savings._id,
+
+            category:
+              savings.category,
+
+            progress:
+              savings.progress,
+
+            currentAmount:
+              savings.currentAmount,
+
+            targetAmount:
+              savings.targetAmount,
+          },
+        });
+    }
+
+    // --------------------------------------------------------
+    // NORMAL UPDATE
+    // --------------------------------------------------------
+
+    else {
+      notification =
+        await createNotification({
+          userEmail:
+            savings.email,
+
+          userId:
+            savings.userId,
+
+          title:
+            "📝 Savings Goal Updated",
+
+          message:
+            `Your ${savings.category} savings goal was updated.`,
+
+          type:
+            "info",
+
+          severity:
+            "low",
+
+          relatedId:
+            savings._id,
+
+          relatedType:
+            "Savings",
+
+          actionLink:
+            `/savings/${savings._id}`,
+
+          metadata: {
+            savingsId:
+              savings._id,
+
+            category:
+              savings.category,
+
+            targetAmount:
+              savings.targetAmount,
+
+            currentAmount:
+              savings.currentAmount,
+
+            progress:
+              savings.progress,
+
+            previousProgress:
+              oldProgress,
+
+            previouslyCompleted:
+              oldCompleted,
+          },
+        });
+    }
+
     // ========================================================
     // RESPONSE
     // ========================================================
@@ -1200,14 +2204,30 @@ exports.updateSavings = async (
 
       data: savings,
 
-      notification:
-        milestoneNotification,
+      notification,
     });
   } catch (error) {
     console.error(
       "❌ Update savings error:",
       error
     );
+
+    if (
+      error.name === "ValidationError"
+    ) {
+      return res.status(400).json({
+        success: false,
+
+        message:
+          "Savings validation failed",
+
+        errors: Object.values(
+          error.errors
+        ).map(
+          (err) => err.message
+        ),
+      });
+    }
 
     return res.status(500).json({
       success: false,
@@ -1229,10 +2249,20 @@ exports.deleteSavings = async (
   res
 ) => {
   try {
+    const { id } = req.params;
+
+    if (
+      !mongoose.Types.ObjectId.isValid(id)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid savings ID",
+      });
+    }
+
     const savings =
-      await Savings.findById(
-        req.params.id
-      );
+      await Savings.findById(id);
 
     if (!savings) {
       return res.status(404).json({
@@ -1243,55 +2273,88 @@ exports.deleteSavings = async (
     }
 
     // ========================================================
-    // DELETE SAVINGS
+    // SAVE VALUES BEFORE DELETE
+    // ========================================================
+
+    const savingsId =
+      savings._id;
+
+    const savingsEmail =
+      savings.email;
+
+    const savingsUserId =
+      savings.userId;
+
+    const savingsCategory =
+      savings.category;
+
+    const savingsTarget =
+      Number(
+        savings.targetAmount
+      ) || 0;
+
+    const savingsCurrent =
+      Number(
+        savings.currentAmount
+      ) || 0;
+
+    // ========================================================
+    // DELETE
     // ========================================================
 
     await savings.deleteOne();
 
     // ========================================================
-    // DELETE NOTIFICATION
-    // IS NOT DONE HERE
-    //
-    // The notification is historical.
+    // HISTORICAL NOTIFICATION
     // ========================================================
 
     const notification =
       await createNotification({
-        userEmail: savings.email,
+        userEmail:
+          savingsEmail,
 
-        userId: savings.userId,
+        userId:
+          savingsUserId,
 
         title:
           "🗑️ Savings Goal Deleted",
 
         message:
-          `Your ${savings.category} ` +
+          `Your ${savingsCategory} ` +
           `savings goal was deleted.`,
 
-        type: "savings",
+        type:
+          "warning",
 
-        severity: "medium",
+        severity:
+          "medium",
 
-        relatedId: savings._id,
+        relatedId:
+          savingsId,
 
-        relatedType: "Savings",
+        relatedType:
+          "Savings",
 
         actionLink:
           "/savings",
 
         metadata: {
-          savingsId: savings._id,
+          savingsId,
 
           category:
-            savings.category,
+            savingsCategory,
 
           targetAmount:
-            savings.targetAmount,
+            savingsTarget,
 
           currentAmount:
-            savings.currentAmount,
+            savingsCurrent,
         },
       });
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
 
     return res.status(200).json({
       success: true,
@@ -1317,3 +2380,4 @@ exports.deleteSavings = async (
     });
   }
 };
+

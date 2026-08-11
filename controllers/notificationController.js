@@ -209,20 +209,989 @@
 //   }
 // };
 
-// ============================================================
-// CONTROLLERS / NOTIFICATIONCONTROLLER.JS
-// ============================================================
+// // ============================================================
+// // CONTROLLERS / NOTIFICATIONCONTROLLER.JS
+// // ============================================================
 
+// const Notification = require("../models/Notification");
+
+// // ============================================================
+// // GET NOTIFICATIONS BY USER EMAIL
+// // @route GET /api/notifications/:email
+// // ============================================================
+
+// exports.getNotifications = async (req, res) => {
+//   try {
+//     const email = req.params.email;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is required",
+//       });
+//     }
+
+//     const normalizedEmail = email.trim().toLowerCase();
+
+//     const notifications = await Notification.find({
+//       userEmail: normalizedEmail,
+//     }).sort({
+//       createdAt: -1,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       count: notifications.length,
+//       notifications,
+//     });
+//   } catch (error) {
+//     console.error("❌ Get user notifications error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch notifications",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // GET ALL NOTIFICATIONS
+// // @route GET /api/notifications/all
+// // ============================================================
+
+// exports.getAllNotifications = async (req, res) => {
+//   try {
+//     const notifications = await Notification.find({})
+//       .sort({
+//         createdAt: -1,
+//       })
+//       .lean();
+
+//     return res.status(200).json({
+//       success: true,
+//       count: notifications.length,
+//       notifications,
+//     });
+//   } catch (error) {
+//     console.error("❌ Get all notifications error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch notifications",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // GET NOTIFICATION BY ID
+// // @route GET /api/notifications/:id
+// // ============================================================
+
+// exports.getNotification = async (req, res) => {
+//   try {
+//     const notification = await Notification.findById(req.params.id);
+
+//     if (!notification) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Notification not found",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       data: notification,
+//     });
+//   } catch (error) {
+//     console.error("❌ Get notification error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch notification",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // MARK ONE NOTIFICATION AS READ
+// // @route PUT /api/notifications/:id/read
+// // ============================================================
+
+// exports.markAsRead = async (req, res) => {
+//   try {
+//     const notification = await Notification.findById(req.params.id);
+
+//     if (!notification) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Notification not found",
+//       });
+//     }
+
+//     notification.isRead = true;
+//     notification.readAt = new Date();
+
+//     await notification.save();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Notification marked as read",
+//       data: notification,
+//     });
+//   } catch (error) {
+//     console.error("❌ Mark notification as read error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to mark notification as read",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // MARK ALL USER NOTIFICATIONS AS READ
+// // @route PUT /api/notifications/read-all/:email
+// // ============================================================
+
+// exports.markAllAsRead = async (req, res) => {
+//   try {
+//     const email = req.params.email;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is required",
+//       });
+//     }
+
+//     const normalizedEmail = email.trim().toLowerCase();
+
+//     const readAt = new Date();
+
+//     const result = await Notification.updateMany(
+//       {
+//         userEmail: normalizedEmail,
+//         isRead: false,
+//       },
+//       {
+//         $set: {
+//           isRead: true,
+//           readAt,
+//         },
+//       },
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "All notifications marked as read",
+//       modifiedCount: result.modifiedCount,
+//     });
+//   } catch (error) {
+//     console.error("❌ Mark all notifications as read error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to mark all notifications as read",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // DELETE ONE NOTIFICATION
+// // @route DELETE /api/notifications/:id
+// // ============================================================
+
+// exports.deleteNotification = async (req, res) => {
+//   try {
+//     const notification = await Notification.findByIdAndDelete(req.params.id);
+
+//     if (!notification) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Notification not found",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Notification deleted successfully",
+//       data: notification,
+//     });
+//   } catch (error) {
+//     console.error("❌ Delete notification error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to delete notification",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // DELETE ALL NOTIFICATIONS FOR USER
+// // @route DELETE /api/notifications/user/:email
+// // ============================================================
+
+// exports.deleteAllUserNotifications = async (req, res) => {
+//   try {
+//     const email = req.params.email;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is required",
+//       });
+//     }
+
+//     const normalizedEmail = email.trim().toLowerCase();
+
+//     const result = await Notification.deleteMany({
+//       userEmail: normalizedEmail,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "All user notifications deleted successfully",
+//       deletedCount: result.deletedCount,
+//     });
+//   } catch (error) {
+//     console.error("❌ Delete all user notifications error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to delete user notifications",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // BULK MARK NOTIFICATIONS AS READ
+// // @route PUT /api/notifications/bulk-read
+// // ============================================================
+
+// exports.bulkMarkAsRead = async (req, res) => {
+//   try {
+//     const { notificationIds } = req.body;
+
+//     if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please provide an array of notification IDs",
+//       });
+//     }
+
+//     const readAt = new Date();
+
+//     const result = await Notification.updateMany(
+//       {
+//         _id: {
+//           $in: notificationIds,
+//         },
+//         isRead: false,
+//       },
+//       {
+//         $set: {
+//           isRead: true,
+//           readAt,
+//         },
+//       },
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Notifications marked as read successfully",
+//       matchedCount: result.matchedCount,
+//       modifiedCount: result.modifiedCount,
+//     });
+//   } catch (error) {
+//     console.error("❌ Bulk mark notifications as read error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to mark notifications as read",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // BULK DELETE NOTIFICATIONS
+// // @route DELETE /api/notifications/bulk
+// // ============================================================
+
+// exports.bulkDeleteNotifications = async (req, res) => {
+//   try {
+//     const { notificationIds } = req.body;
+
+//     if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please provide an array of notification IDs",
+//       });
+//     }
+
+//     const result = await Notification.deleteMany({
+//       _id: {
+//         $in: notificationIds,
+//       },
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Notifications deleted successfully",
+//       deletedCount: result.deletedCount,
+//     });
+//   } catch (error) {
+//     console.error("❌ Bulk delete notifications error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to delete notifications",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // NOTIFICATION STATISTICS
+// // @route GET /api/notifications/statistics
+// // ============================================================
+
+// exports.statistics = async (req, res) => {
+//   try {
+//     const total = await Notification.countDocuments();
+
+//     const unread = await Notification.countDocuments({
+//       isRead: false,
+//     });
+
+//     const read = await Notification.countDocuments({
+//       isRead: true,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       data: {
+//         total,
+//         read,
+//         unread,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("❌ Notification statistics error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch notification statistics",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // USER NOTIFICATION STATISTICS
+// // @route GET /api/notifications/statistics/:email
+// // ============================================================
+
+// exports.userStatistics = async (req, res) => {
+//   try {
+//     const email = req.params.email;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is required",
+//       });
+//     }
+
+//     const userEmail = email.trim().toLowerCase();
+
+//     const total = await Notification.countDocuments({
+//       userEmail,
+//     });
+
+//     const unread = await Notification.countDocuments({
+//       userEmail,
+//       isRead: false,
+//     });
+
+//     const read = await Notification.countDocuments({
+//       userEmail,
+//       isRead: true,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       data: {
+//         total,
+//         read,
+//         unread,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("❌ User notification statistics error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch user notification statistics",
+//       error: error.message,
+//     });
+//   }
+// };
+
+
+
+
+
+
+
+
+// // ============================================================
+// // CONTROLLERS / NOTIFICATIONCONTROLLER.JS
+// // ============================================================
+
+// const Notification = require("../models/Notification");
+// const mongoose = require("mongoose");
+
+// // ============================================================
+// // GET NOTIFICATIONS BY USER EMAIL
+// // @route GET /api/notifications/email/:email
+// // ============================================================
+
+// exports.getNotifications = async (req, res) => {
+//   try {
+//     const { email } = req.params;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is required",
+//       });
+//     }
+
+//     const normalizedEmail = email.trim().toLowerCase();
+
+//     const notifications = await Notification.find({
+//       email: normalizedEmail,
+//     }).sort({
+//       createdAt: -1,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       count: notifications.length,
+//       notifications,
+//     });
+//   } catch (error) {
+//     console.error("❌ Get user notifications error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch notifications",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // GET ALL NOTIFICATIONS
+// // @route GET /api/notifications/all
+// // ============================================================
+
+// exports.getAllNotifications = async (req, res) => {
+//   try {
+//     const notifications = await Notification.find({})
+//       .sort({
+//         createdAt: -1,
+//       })
+//       .lean();
+
+//     return res.status(200).json({
+//       success: true,
+//       count: notifications.length,
+//       notifications,
+//     });
+//   } catch (error) {
+//     console.error("❌ Get all notifications error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch notifications",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // GET NOTIFICATION BY ID
+// // @route GET /api/notifications/:id
+// // ============================================================
+
+// exports.getNotification = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid notification ID",
+//       });
+//     }
+
+//     const notification = await Notification.findById(id);
+
+//     if (!notification) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Notification not found",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       data: notification,
+//     });
+//   } catch (error) {
+//     console.error("❌ Get notification error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch notification",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // MARK ONE NOTIFICATION AS READ
+// // @route PUT /api/notifications/:id/read
+// // ============================================================
+
+// exports.markAsRead = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid notification ID",
+//       });
+//     }
+
+//     const notification = await Notification.findById(id);
+
+//     if (!notification) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Notification not found",
+//       });
+//     }
+
+//     notification.isRead = true;
+//     notification.readAt = new Date();
+
+//     await notification.save();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Notification marked as read",
+//       data: notification,
+//     });
+//   } catch (error) {
+//     console.error("❌ Mark notification as read error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to mark notification as read",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // MARK ALL USER NOTIFICATIONS AS READ
+// // @route PUT /api/notifications/read-all/:email
+// // ============================================================
+
+// exports.markAllAsRead = async (req, res) => {
+//   try {
+//     const { email } = req.params;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is required",
+//       });
+//     }
+
+//     const normalizedEmail = email.trim().toLowerCase();
+
+//     const readAt = new Date();
+
+//     const result = await Notification.updateMany(
+//       {
+//         email: normalizedEmail,
+//         isRead: false,
+//       },
+//       {
+//         $set: {
+//           isRead: true,
+//           readAt,
+//         },
+//       }
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "All notifications marked as read",
+//       modifiedCount: result.modifiedCount,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Mark all notifications as read error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to mark all notifications as read",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // DELETE ONE NOTIFICATION
+// // @route DELETE /api/notifications/:id
+// // ============================================================
+
+// exports.deleteNotification = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid notification ID",
+//       });
+//     }
+
+//     const notification = await Notification.findByIdAndDelete(id);
+
+//     if (!notification) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Notification not found",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Notification deleted successfully",
+//       data: notification,
+//     });
+//   } catch (error) {
+//     console.error("❌ Delete notification error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to delete notification",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // DELETE ALL NOTIFICATIONS FOR USER
+// // @route DELETE /api/notifications/user/:email
+// // ============================================================
+
+// exports.deleteAllUserNotifications = async (req, res) => {
+//   try {
+//     const { email } = req.params;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is required",
+//       });
+//     }
+
+//     const normalizedEmail = email.trim().toLowerCase();
+
+//     const result = await Notification.deleteMany({
+//       email: normalizedEmail,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "All user notifications deleted successfully",
+//       deletedCount: result.deletedCount,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Delete all user notifications error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to delete user notifications",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // BULK MARK NOTIFICATIONS AS READ
+// // @route PUT /api/notifications/bulk-read
+// // ============================================================
+
+// exports.bulkMarkAsRead = async (req, res) => {
+//   try {
+//     const { notificationIds } = req.body;
+
+//     if (
+//       !Array.isArray(notificationIds) ||
+//       notificationIds.length === 0
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please provide an array of notification IDs",
+//       });
+//     }
+
+//     const invalidIds = notificationIds.some(
+//       (id) => !mongoose.Types.ObjectId.isValid(id)
+//     );
+
+//     if (invalidIds) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "One or more notification IDs are invalid",
+//       });
+//     }
+
+//     const readAt = new Date();
+
+//     const result = await Notification.updateMany(
+//       {
+//         _id: {
+//           $in: notificationIds,
+//         },
+//         isRead: false,
+//       },
+//       {
+//         $set: {
+//           isRead: true,
+//           readAt,
+//         },
+//       }
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Notifications marked as read successfully",
+//       matchedCount: result.matchedCount,
+//       modifiedCount: result.modifiedCount,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Bulk mark notifications as read error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to mark notifications as read",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // BULK DELETE NOTIFICATIONS
+// // @route DELETE /api/notifications/bulk
+// // ============================================================
+
+// exports.bulkDeleteNotifications = async (req, res) => {
+//   try {
+//     const { notificationIds } = req.body;
+
+//     if (
+//       !Array.isArray(notificationIds) ||
+//       notificationIds.length === 0
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please provide an array of notification IDs",
+//       });
+//     }
+
+//     const invalidIds = notificationIds.some(
+//       (id) => !mongoose.Types.ObjectId.isValid(id)
+//     );
+
+//     if (invalidIds) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "One or more notification IDs are invalid",
+//       });
+//     }
+
+//     const result = await Notification.deleteMany({
+//       _id: {
+//         $in: notificationIds,
+//       },
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Notifications deleted successfully",
+//       deletedCount: result.deletedCount,
+//     });
+//   } catch (error) {
+//     console.error("❌ Bulk delete notifications error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to delete notifications",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // NOTIFICATION STATISTICS
+// // @route GET /api/notifications/statistics
+// // ============================================================
+
+// exports.statistics = async (req, res) => {
+//   try {
+//     const total = await Notification.countDocuments();
+
+//     const unread = await Notification.countDocuments({
+//       isRead: false,
+//     });
+
+//     const read = await Notification.countDocuments({
+//       isRead: true,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       data: {
+//         total,
+//         read,
+//         unread,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("❌ Notification statistics error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch notification statistics",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // USER NOTIFICATION STATISTICS
+// // @route GET /api/notifications/statistics/:email
+// // ============================================================
+
+// exports.userStatistics = async (req, res) => {
+//   try {
+//     const { email } = req.params;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is required",
+//       });
+//     }
+
+//     const normalizedEmail = email.trim().toLowerCase();
+
+//     const total = await Notification.countDocuments({
+//       email: normalizedEmail,
+//     });
+
+//     const unread = await Notification.countDocuments({
+//       email: normalizedEmail,
+//       isRead: false,
+//     });
+
+//     const read = await Notification.countDocuments({
+//       email: normalizedEmail,
+//       isRead: true,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       data: {
+//         total,
+//         read,
+//         unread,
+//       },
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ User notification statistics error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch user notification statistics",
+//       error: error.message,
+//     });
+//   }
+// };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const mongoose = require("mongoose");
 const Notification = require("../models/Notification");
 
 // ============================================================
+// HELPER
+// ============================================================
+
+const normalizeEmail = (email) => {
+  return String(email || "")
+    .trim()
+    .toLowerCase();
+};
+
+// ============================================================
 // GET NOTIFICATIONS BY USER EMAIL
-// @route GET /api/notifications/:email
+// @route GET /api/notifications/email/:email
 // ============================================================
 
 exports.getNotifications = async (req, res) => {
   try {
-    const email = req.params.email;
+    const email = normalizeEmail(req.params.email);
 
     if (!email) {
       return res.status(400).json({
@@ -231,13 +1200,13 @@ exports.getNotifications = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
     const notifications = await Notification.find({
-      userEmail: normalizedEmail,
-    }).sort({
-      createdAt: -1,
-    });
+      email,
+    })
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
 
     return res.status(200).json({
       success: true,
@@ -245,7 +1214,53 @@ exports.getNotifications = async (req, res) => {
       notifications,
     });
   } catch (error) {
-    console.error("❌ Get user notifications error:", error);
+    console.error(
+      "❌ Get user notifications error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch notifications",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// GET NOTIFICATIONS BY USER ID
+// @route GET /api/notifications/user/:userId
+// ============================================================
+
+exports.getNotificationsByUserId = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    const notifications = await Notification.find({
+      userId,
+    })
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: notifications.length,
+      notifications,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Get notifications by user ID error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -274,7 +1289,10 @@ exports.getAllNotifications = async (req, res) => {
       notifications,
     });
   } catch (error) {
-    console.error("❌ Get all notifications error:", error);
+    console.error(
+      "❌ Get all notifications error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -291,7 +1309,16 @@ exports.getAllNotifications = async (req, res) => {
 
 exports.getNotification = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id);
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid notification ID",
+      });
+    }
+
+    const notification = await Notification.findById(id);
 
     if (!notification) {
       return res.status(404).json({
@@ -305,7 +1332,10 @@ exports.getNotification = async (req, res) => {
       data: notification,
     });
   } catch (error) {
-    console.error("❌ Get notification error:", error);
+    console.error(
+      "❌ Get notification error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -322,7 +1352,16 @@ exports.getNotification = async (req, res) => {
 
 exports.markAsRead = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id);
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid notification ID",
+      });
+    }
+
+    const notification = await Notification.findById(id);
 
     if (!notification) {
       return res.status(404).json({
@@ -342,7 +1381,10 @@ exports.markAsRead = async (req, res) => {
       data: notification,
     });
   } catch (error) {
-    console.error("❌ Mark notification as read error:", error);
+    console.error(
+      "❌ Mark notification as read error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -353,13 +1395,13 @@ exports.markAsRead = async (req, res) => {
 };
 
 // ============================================================
-// MARK ALL USER NOTIFICATIONS AS READ
-// @route PUT /api/notifications/read-all/:email
+// MARK ALL USER NOTIFICATIONS AS READ BY EMAIL
+// @route PUT /api/notifications/read-all/email/:email
 // ============================================================
 
 exports.markAllAsRead = async (req, res) => {
   try {
-    const email = req.params.email;
+    const email = normalizeEmail(req.params.email);
 
     if (!email) {
       return res.status(400).json({
@@ -368,13 +1410,11 @@ exports.markAllAsRead = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
     const readAt = new Date();
 
     const result = await Notification.updateMany(
       {
-        userEmail: normalizedEmail,
+        email,
         isRead: false,
       },
       {
@@ -382,16 +1422,71 @@ exports.markAllAsRead = async (req, res) => {
           isRead: true,
           readAt,
         },
-      },
+      }
     );
 
     return res.status(200).json({
       success: true,
       message: "All notifications marked as read",
+      matchedCount: result.matchedCount,
       modifiedCount: result.modifiedCount,
     });
   } catch (error) {
-    console.error("❌ Mark all notifications as read error:", error);
+    console.error(
+      "❌ Mark all notifications as read error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to mark all notifications as read",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// MARK ALL USER NOTIFICATIONS AS READ BY USER ID
+// @route PUT /api/notifications/read-all/user/:userId
+// ============================================================
+
+exports.markAllAsReadByUserId = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    const readAt = new Date();
+
+    const result = await Notification.updateMany(
+      {
+        userId,
+        isRead: false,
+      },
+      {
+        $set: {
+          isRead: true,
+          readAt,
+        },
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "All notifications marked as read",
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Mark all notifications by user ID error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -408,7 +1503,17 @@ exports.markAllAsRead = async (req, res) => {
 
 exports.deleteNotification = async (req, res) => {
   try {
-    const notification = await Notification.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid notification ID",
+      });
+    }
+
+    const notification =
+      await Notification.findByIdAndDelete(id);
 
     if (!notification) {
       return res.status(404).json({
@@ -423,7 +1528,10 @@ exports.deleteNotification = async (req, res) => {
       data: notification,
     });
   } catch (error) {
-    console.error("❌ Delete notification error:", error);
+    console.error(
+      "❌ Delete notification error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -434,13 +1542,13 @@ exports.deleteNotification = async (req, res) => {
 };
 
 // ============================================================
-// DELETE ALL NOTIFICATIONS FOR USER
-// @route DELETE /api/notifications/user/:email
+// DELETE ALL NOTIFICATIONS FOR USER BY EMAIL
+// @route DELETE /api/notifications/user/email/:email
 // ============================================================
 
 exports.deleteAllUserNotifications = async (req, res) => {
   try {
-    const email = req.params.email;
+    const email = normalizeEmail(req.params.email);
 
     if (!email) {
       return res.status(400).json({
@@ -449,19 +1557,64 @@ exports.deleteAllUserNotifications = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
     const result = await Notification.deleteMany({
-      userEmail: normalizedEmail,
+      email,
     });
 
     return res.status(200).json({
       success: true,
-      message: "All user notifications deleted successfully",
+      message:
+        "All user notifications deleted successfully",
       deletedCount: result.deletedCount,
     });
   } catch (error) {
-    console.error("❌ Delete all user notifications error:", error);
+    console.error(
+      "❌ Delete all user notifications error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete user notifications",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// DELETE ALL NOTIFICATIONS FOR USER BY USER ID
+// @route DELETE /api/notifications/user/:userId
+// ============================================================
+
+exports.deleteAllUserNotificationsByUserId = async (
+  req,
+  res
+) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    const result = await Notification.deleteMany({
+      userId,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "All user notifications deleted successfully",
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Delete all user notifications by user ID error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -480,10 +1633,25 @@ exports.bulkMarkAsRead = async (req, res) => {
   try {
     const { notificationIds } = req.body;
 
-    if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+    if (
+      !Array.isArray(notificationIds) ||
+      notificationIds.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Please provide an array of notification IDs",
+        message:
+          "Please provide an array of notification IDs",
+      });
+    }
+
+    const invalidIds = notificationIds.filter(
+      (id) => !mongoose.Types.ObjectId.isValid(id)
+    );
+
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "One or more notification IDs are invalid",
       });
     }
 
@@ -501,21 +1669,26 @@ exports.bulkMarkAsRead = async (req, res) => {
           isRead: true,
           readAt,
         },
-      },
+      }
     );
 
     return res.status(200).json({
       success: true,
-      message: "Notifications marked as read successfully",
+      message:
+        "Notifications marked as read successfully",
       matchedCount: result.matchedCount,
       modifiedCount: result.modifiedCount,
     });
   } catch (error) {
-    console.error("❌ Bulk mark notifications as read error:", error);
+    console.error(
+      "❌ Bulk mark notifications as read error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to mark notifications as read",
+      message:
+        "Failed to mark notifications as read",
       error: error.message,
     });
   }
@@ -530,10 +1703,25 @@ exports.bulkDeleteNotifications = async (req, res) => {
   try {
     const { notificationIds } = req.body;
 
-    if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+    if (
+      !Array.isArray(notificationIds) ||
+      notificationIds.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Please provide an array of notification IDs",
+        message:
+          "Please provide an array of notification IDs",
+      });
+    }
+
+    const invalidIds = notificationIds.filter(
+      (id) => !mongoose.Types.ObjectId.isValid(id)
+    );
+
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "One or more notification IDs are invalid",
       });
     }
 
@@ -549,7 +1737,10 @@ exports.bulkDeleteNotifications = async (req, res) => {
       deletedCount: result.deletedCount,
     });
   } catch (error) {
-    console.error("❌ Bulk delete notifications error:", error);
+    console.error(
+      "❌ Bulk delete notifications error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -566,15 +1757,15 @@ exports.bulkDeleteNotifications = async (req, res) => {
 
 exports.statistics = async (req, res) => {
   try {
-    const total = await Notification.countDocuments();
-
-    const unread = await Notification.countDocuments({
-      isRead: false,
-    });
-
-    const read = await Notification.countDocuments({
-      isRead: true,
-    });
+    const [total, unread, read] = await Promise.all([
+      Notification.countDocuments(),
+      Notification.countDocuments({
+        isRead: false,
+      }),
+      Notification.countDocuments({
+        isRead: true,
+      }),
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -585,24 +1776,28 @@ exports.statistics = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Notification statistics error:", error);
+    console.error(
+      "❌ Notification statistics error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch notification statistics",
+      message:
+        "Failed to fetch notification statistics",
       error: error.message,
     });
   }
 };
 
 // ============================================================
-// USER NOTIFICATION STATISTICS
-// @route GET /api/notifications/statistics/:email
+// USER NOTIFICATION STATISTICS BY EMAIL
+// @route GET /api/notifications/statistics/email/:email
 // ============================================================
 
 exports.userStatistics = async (req, res) => {
   try {
-    const email = req.params.email;
+    const email = normalizeEmail(req.params.email);
 
     if (!email) {
       return res.status(400).json({
@@ -611,21 +1806,19 @@ exports.userStatistics = async (req, res) => {
       });
     }
 
-    const userEmail = email.trim().toLowerCase();
-
-    const total = await Notification.countDocuments({
-      userEmail,
-    });
-
-    const unread = await Notification.countDocuments({
-      userEmail,
-      isRead: false,
-    });
-
-    const read = await Notification.countDocuments({
-      userEmail,
-      isRead: true,
-    });
+    const [total, unread, read] = await Promise.all([
+      Notification.countDocuments({
+        email,
+      }),
+      Notification.countDocuments({
+        email,
+        isRead: false,
+      }),
+      Notification.countDocuments({
+        email,
+        isRead: true,
+      }),
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -636,12 +1829,70 @@ exports.userStatistics = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ User notification statistics error:", error);
+    console.error(
+      "❌ User notification statistics error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch user notification statistics",
+      message:
+        "Failed to fetch user notification statistics",
       error: error.message,
     });
   }
 };
+
+// ============================================================
+// USER NOTIFICATION STATISTICS BY USER ID
+// @route GET /api/notifications/statistics/user/:userId
+// ============================================================
+
+exports.userStatisticsByUserId = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    const [total, unread, read] = await Promise.all([
+      Notification.countDocuments({
+        userId,
+      }),
+      Notification.countDocuments({
+        userId,
+        isRead: false,
+      }),
+      Notification.countDocuments({
+        userId,
+        isRead: true,
+      }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        total,
+        read,
+        unread,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "❌ User notification statistics by user ID error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to fetch user notification statistics",
+      error: error.message,
+    });
+  }
+};
+
