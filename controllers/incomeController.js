@@ -1,824 +1,9 @@
-// const Income = require("../models/Income");
-// const Budget = require("../models/Budget");
-// const Notification = require("../models/Notification");
-// const mongoose = require("mongoose");
-
-// // Helper function to create notification
-// const createNotification = require("../utils/createNotification");
-
-// // Helper function to update budget spent amounts
-// const updateBudgetSpent = async (email, category, amount, month, year) => {
-//   try {
-//     const budget = await Budget.findOne({
-//       email: email.toLowerCase(),
-//       category: category,
-//       month: month,
-//       year: year,
-//     });
-
-//     if (budget) {
-//       budget.spentAmount = (budget.spentAmount || 0) + amount;
-//       budget.remainingAmount = Math.max(
-//         0,
-//         budget.allocatedAmount - budget.spentAmount,
-//       );
-//       budget.percentageUsed =
-//         budget.allocatedAmount > 0
-//           ? Math.min(100, (budget.spentAmount / budget.allocatedAmount) * 100)
-//           : 0;
-
-//       // Update status based on percentage
-//       if (budget.percentageUsed > 100) {
-//         budget.status = "over-budget";
-//         // Create over-budget notification
-//         await createNotification(
-//           email,
-//           `⚠️ Budget Alert: ${category} Over Budget`,
-//           `You have exceeded your ${category} budget. Spent: $${budget.spentAmount.toFixed(2)} vs Budget: $${budget.allocatedAmount.toFixed(2)}`,
-//           "budget_alert",
-//           "high",
-//           budget._id,
-//           "Budget",
-//         );
-//       } else if (budget.percentageUsed > 80) {
-//         budget.status = "approaching-limit";
-//         // Create approaching limit notification
-//         await createNotification(
-//           email,
-//           `⚡ Budget Alert: ${category} Approaching Limit`,
-//           `You are approaching your ${category} budget limit. Used: ${budget.percentageUsed.toFixed(1)}% ($${budget.spentAmount.toFixed(2)} of $${budget.allocatedAmount.toFixed(2)})`,
-//           "budget_alert",
-//           "medium",
-//           budget._id,
-//           "Budget",
-//         );
-//       } else if (budget.percentageUsed < 50 && budget.spentAmount > 0) {
-//         budget.status = "under-budget";
-//       } else {
-//         budget.status = "on-track";
-//       }
-
-//       await budget.save();
-//       return budget;
-//     }
-//     return null;
-//   } catch (error) {
-//     console.error("Update budget spent error:", error);
-//     return null;
-//   }
-// };
-
-// // @desc    Get all incomes with budget summary
-// // @route   GET /api/incomes
-// // @access  Private
-
-// exports.getIncomes = async (req, res) => {
-//   try {
-//     const {
-//       category,
-//       source,
-//       startDate,
-//       endDate,
-//       search,
-//       month,
-//       year,
-//     } = req.query;
-
-//     // ============================================================
-//     // BUILD INCOME QUERY
-//     // ============================================================
-//     const query = {};
-
-//     if (
-//       category &&
-//       category !== "all"
-//     ) {
-//       query.category = category;
-//     }
-
-//     if (
-//       source &&
-//       source !== "all"
-//     ) {
-//       query.source = source;
-//     }
-
-//     // ============================================================
-//     // DATE FILTER
-//     // ============================================================
-//     if (startDate || endDate) {
-//       query.date = {};
-
-//       if (startDate) {
-//         query.date.$gte =
-//           new Date(startDate);
-//       }
-
-//       if (endDate) {
-//         const end = new Date(endDate);
-
-//         // Include the entire end date
-//         end.setHours(
-//           23,
-//           59,
-//           59,
-//           999
-//         );
-
-//         query.date.$lte = end;
-//       }
-//     }
-
-//     // ============================================================
-//     // SEARCH
-//     // ============================================================
-//     if (search) {
-//       query.$or = [
-//         {
-//           description: {
-//             $regex: search,
-//             $options: "i",
-//           },
-//         },
-
-//         {
-//           category: {
-//             $regex: search,
-//             $options: "i",
-//           },
-//         },
-
-//         {
-//           source: {
-//             $regex: search,
-//             $options: "i",
-//           },
-//         },
-
-//         {
-//           user: {
-//             $regex: search,
-//             $options: "i",
-//           },
-//         },
-
-//         {
-//           email: {
-//             $regex: search,
-//             $options: "i",
-//           },
-//         },
-//       ];
-//     }
-
-//     // ============================================================
-//     // FETCH INCOMES
-//     // ============================================================
-//     const incomes = await Income.find(
-//       query
-//     ).sort({
-//       date: -1,
-//       createdAt: -1,
-//     });
-
-//     // ============================================================
-//     // CURRENT / REQUESTED MONTH AND YEAR
-//     //
-//     // JavaScript:
-//     // January = 0
-//     // December = 11
-//     // ============================================================
-//     const currentMonth =
-//       month !== undefined
-//         ? parseInt(month, 10)
-//         : new Date().getMonth();
-
-//     const currentYear =
-//       year !== undefined
-//         ? parseInt(year, 10)
-//         : new Date().getFullYear();
-
-//     // ============================================================
-//     // FETCH ALL BUDGETS FOR MONTH/YEAR
-//     //
-//     // No email filter here, as requested.
-//     // ============================================================
-//     const budgets = await Budget.find({
-//       month: currentMonth,
-//       year: currentYear,
-//     });
-
-//     // ============================================================
-//     // CALCULATE MONTHLY INCOME
-//     // ============================================================
-//     const monthIncomes =
-//       incomes.filter((income) => {
-//         const incomeDate =
-//           new Date(income.date);
-
-//         return (
-//           incomeDate.getMonth() ===
-//             currentMonth &&
-//           incomeDate.getFullYear() ===
-//             currentYear
-//         );
-//       });
-
-//     const totalMonthlyIncome =
-//       monthIncomes.reduce(
-//         (sum, income) =>
-//           sum +
-//           Number(income.amount || 0),
-//         0
-//       );
-
-//     // ============================================================
-//     // CALCULATE BUDGET TOTALS
-//     // ============================================================
-//     const totalBudgeted =
-//       budgets.reduce(
-//         (sum, budget) =>
-//           sum +
-//           Number(
-//             budget.allocatedAmount || 0
-//           ),
-//         0
-//       );
-
-//     const totalSpent =
-//       budgets.reduce(
-//         (sum, budget) =>
-//           sum +
-//           Number(
-//             budget.spentAmount || 0
-//           ),
-//         0
-//       );
-
-//     const remainingBudget =
-//       totalBudgeted - totalSpent;
-
-//     // ============================================================
-//     // BUDGET CATEGORY SUMMARY
-//     // ============================================================
-//     const budgetSummary =
-//       budgets.map((budget) => ({
-//         id: budget._id,
-
-//         category:
-//           budget.category,
-
-//         allocated:
-//           Number(
-//             budget.allocatedAmount || 0
-//           ),
-
-//         spent:
-//           Number(
-//             budget.spentAmount || 0
-//           ),
-
-//         remaining:
-//           Number(
-//             budget.remainingAmount || 0
-//           ),
-
-//         percentageUsed:
-//           Number(
-//             budget.percentageUsed || 0
-//           ),
-
-//         status:
-//           budget.status ||
-//           "on-track",
-
-//         month:
-//           budget.month,
-
-//         year:
-//           budget.year,
-//       }));
-
-//     // ============================================================
-//     // SAVINGS RATE
-//     // ============================================================
-//     const savingsRate =
-//       totalMonthlyIncome > 0
-//         ? ((totalMonthlyIncome -
-//             totalSpent) /
-//             totalMonthlyIncome) *
-//           100
-//         : 0;
-
-//     // ============================================================
-//     // RESPONSE
-//     // ============================================================
-//     return res.status(200).json({
-//       success: true,
-
-//       count: incomes.length,
-
-//       data: incomes,
-
-//       budgetSummary: {
-//         totalBudgeted,
-
-//         totalSpent,
-
-//         remainingBudget,
-
-//         totalMonthlyIncome,
-
-//         savingsRate:
-//           Number(
-//             savingsRate.toFixed(2)
-//           ),
-
-//         categories:
-//           budgetSummary,
-//       },
-//     });
-//   } catch (error) {
-//     console.error(
-//       "❌ Get incomes error:",
-//       error
-//     );
-
-//     return res.status(500).json({
-//       success: false,
-
-//       message: "Failed to fetch incomes",
-
-//       error: error.message,
-//     });
-//   }
-// };
-
-// // @desc    Get single income
-// // @route   GET /api/incomes/:id
-// // @access  Private
-// exports.getIncome = async (req, res) => {
-//   try {
-//     const income = await Income.findById(req.params.id);
-
-//     if (!income) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Income not found",
-//       });
-//     }
-
-//     res.status(200).json({
-//       success: true,
-//       data: income,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to fetch income",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// // @desc    Create income
-// // @route   POST /api/incomes
-// // @access  Private
-
-// exports.createIncome = async (req, res) => {
-//   try {
-//     const {
-//       description,
-//       category,
-//       source,
-//       amount,
-//       date,
-//       user,
-//       email,
-//       isRecurring,
-//       frequency,
-//     } = req.body;
-
-//     if (!description || !category || !amount || !date || !user || !email) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "All fields are required",
-//       });
-//     }
-
-//     const income = await Income.create({
-//       description,
-//       category,
-//       source: source || category,
-//       amount: Number(amount),
-//       remainingAmount: Number(amount),
-//       date,
-//       user,
-//       email: email.toLowerCase(),
-//       isRecurring: isRecurring || false,
-//       frequency: frequency || "monthly",
-//     });
-
-//     // ✅ CORRECT PLACE FOR NOTIFICATION
-//     await createNotification({
-//       email,
-//       title: "💰 Income Added",
-//       message: `You received ${amount} from ${source || category}`,
-//       type: "info",
-//       referenceId: income._id,
-//       referenceModel: "Income",
-//     });
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Income created successfully",
-//       data: income,
-//     });
-//   } catch (error) {
-//     console.error("Create income error:", error);
-
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to create income",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// // Get Incomes By Email
-// exports.getIncomesByEmail = async (req, res) => {
-//   try {
-//     const { email } = req.params;
-
-//     if (!email) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Email is required",
-//       });
-//     }
-
-//     const incomes = await Income.find({
-//       email: email.toLowerCase(),
-//     }).sort({
-//       date: -1,
-//       createdAt: -1,
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Incomes retrieved successfully",
-//       count: incomes.length,
-//       data: incomes,
-//     });
-//   } catch (error) {
-//     console.error("Get incomes by email error:", error);
-
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to retrieve incomes",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// // @desc    Update income
-// // @route   PUT /api/incomes/:id
-// // @access  Private
-// exports.updateIncome = async (req, res) => {
-//   try {
-//     const income = await Income.findById(req.params.id);
-
-//     if (!income) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Income not found",
-//       });
-//     }
-
-//     // If amount or category changed, update budget
-//     const oldAmount = income.amount;
-//     const oldCategory = income.category;
-//     const oldDate = new Date(income.date);
-
-//     const updatedIncome = await Income.findByIdAndUpdate(
-//       req.params.id,
-//       req.body,
-//       {
-//         new: true,
-//         runValidators: true,
-//       },
-//     );
-
-//     // If amount or category changed, update budget
-//     if (
-//       oldAmount !== updatedIncome.amount ||
-//       oldCategory !== updatedIncome.category
-//     ) {
-//       // Remove old amount from old category
-//       await updateBudgetSpent(
-//         income.email,
-//         oldCategory,
-//         -oldAmount,
-//         oldDate.getMonth(),
-//         oldDate.getFullYear(),
-//       );
-
-//       // Add new amount to new category
-//       const newDate = new Date(updatedIncome.date);
-//       await updateBudgetSpent(
-//         updatedIncome.email,
-//         updatedIncome.category,
-//         updatedIncome.amount,
-//         newDate.getMonth(),
-//         newDate.getFullYear(),
-//       );
-//     }
-
-//     // Create notification for updated income
-//     await createNotification(
-//       income.email,
-//       `📝 Income Updated: ${updatedIncome.description}`,
-//       `Your ${updatedIncome.category} income has been updated to $${updatedIncome.amount.toFixed(2)}.`,
-//       "info",
-//       "low",
-//       updatedIncome._id,
-//       "Income",
-//     );
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Income updated successfully",
-//       data: updatedIncome,
-//     });
-//   } catch (error) {
-//     console.error("Update income error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to update income",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// // @desc    Delete income
-// // @route   DELETE /api/incomes/:id
-// // @access  Private
-// exports.deleteIncome = async (req, res) => {
-//   try {
-//     const income = await Income.findById(req.params.id);
-
-//     if (!income) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Income not found",
-//       });
-//     }
-
-//     // Remove from budget
-//     const incomeDate = new Date(income.date);
-//     await updateBudgetSpent(
-//       income.email,
-//       income.category,
-//       -income.amount,
-//       incomeDate.getMonth(),
-//       incomeDate.getFullYear(),
-//     );
-
-//     await Income.findByIdAndDelete(req.params.id);
-
-//     // Create notification for deleted income
-//     await createNotification(
-//       income.email,
-//       `🗑️ Income Deleted: ${income.description}`,
-//       `Your ${income.category} income of $${income.amount.toFixed(2)} has been deleted.`,
-//       "warning",
-//       "medium",
-//     );
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Income deleted successfully",
-//     });
-//   } catch (error) {
-//     console.error("Delete income error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to delete income",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// // @desc    Get budget summary with used and left
-// // @route   GET /api/incomes/budget-summary
-// // @access  Private
-// exports.getBudgetSummary = async (req, res) => {
-//   try {
-//     const { email, month, year } = req.query;
-
-//     if (!email && (!req.user || !req.user.email)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Email is required",
-//       });
-//     }
-
-//     const userEmail = email || req.user.email;
-//     const currentMonth =
-//       month !== undefined ? parseInt(month) : new Date().getMonth();
-//     const currentYear = year ? parseInt(year) : new Date().getFullYear();
-
-//     // Get all budgets for the month
-//     const budgets = await Budget.find({
-//       email: userEmail.toLowerCase(),
-//       month: currentMonth,
-//       year: currentYear,
-//     });
-
-//     // Get all incomes for the month
-//     const incomes = await Income.find({
-//       email: userEmail.toLowerCase(),
-//       date: {
-//         $gte: new Date(currentYear, currentMonth, 1),
-//         $lt: new Date(currentYear, currentMonth + 1, 1),
-//       },
-//     });
-
-//     const totalIncome = incomes.reduce((sum, inc) => sum + inc.amount, 0);
-//     const totalBudgeted = budgets.reduce(
-//       (sum, b) => sum + b.allocatedAmount,
-//       0,
-//     );
-//     const totalSpent = budgets.reduce(
-//       (sum, b) => sum + (b.spentAmount || 0),
-//       0,
-//     );
-//     const totalRemaining = totalBudgeted - totalSpent;
-//     const overallPercentage =
-//       totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
-
-//     // Category breakdown
-//     const categoryBreakdown = budgets.map((budget) => {
-//       const categoryIncome = incomes
-//         .filter((inc) => inc.category === budget.category)
-//         .reduce((sum, inc) => sum + inc.amount, 0);
-
-//       return {
-//         category: budget.category,
-//         budgeted: budget.allocatedAmount,
-//         spent: budget.spentAmount || 0,
-//         remaining: budget.remainingAmount || 0,
-//         percentageUsed: budget.percentageUsed || 0,
-//         status: budget.status || "on-track",
-//         income: categoryIncome,
-//       };
-//     });
-
-//     res.status(200).json({
-//       success: true,
-//       data: {
-//         month: currentMonth,
-//         year: currentYear,
-//         totalIncome,
-//         totalBudgeted,
-//         totalSpent,
-//         totalRemaining,
-//         overallPercentage,
-//         status:
-//           overallPercentage > 100
-//             ? "over-budget"
-//             : overallPercentage > 80
-//               ? "approaching-limit"
-//               : overallPercentage < 50 && totalSpent > 0
-//                 ? "under-budget"
-//                 : "on-track",
-//         categories: categoryBreakdown,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Get budget summary error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to fetch budget summary",
-//       error: error.message,
-//     });
-//   }
-// };
-
-// // @desc    Get income statistics
-// // @route   GET /api/incomes/stats
-// // @access  Private
-// exports.getIncomeStats = async (req, res) => {
-//   try {
-//     const { email } = req.query;
-
-//     if (!email && (!req.user || !req.user.email)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Email is required",
-//       });
-//     }
-
-//     const userEmail = email || req.user.email;
-//     const query = { email: userEmail.toLowerCase() };
-
-//     // Get total income
-//     const totalIncome = await Income.aggregate([
-//       { $match: query },
-//       { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
-//     ]);
-
-//     // Get income by category
-//     const categoryStats = await Income.aggregate([
-//       { $match: query },
-//       {
-//         $group: {
-//           _id: "$category",
-//           total: { $sum: "$amount" },
-//           count: { $sum: 1 },
-//         },
-//       },
-//       { $sort: { total: -1 } },
-//     ]);
-
-//     // Get monthly income (last 12 months)
-//     const twelveMonthsAgo = new Date();
-//     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-
-//     const monthlyStats = await Income.aggregate([
-//       {
-//         $match: {
-//           ...query,
-//           date: { $gte: twelveMonthsAgo },
-//         },
-//       },
-//       {
-//         $group: {
-//           _id: {
-//             year: { $year: "$date" },
-//             month: { $month: "$date" },
-//           },
-//           total: { $sum: "$amount" },
-//           count: { $sum: 1 },
-//         },
-//       },
-//       { $sort: { "_id.year": -1, "_id.month": -1 } },
-//     ]);
-
-//     // Get current month budget status
-//     const currentMonth = new Date().getMonth();
-//     const currentYear = new Date().getFullYear();
-
-//     const budgets = await Budget.find({
-//       email: userEmail.toLowerCase(),
-//       month: currentMonth,
-//       year: currentYear,
-//     });
-
-//     const totalBudgeted = budgets.reduce(
-//       (sum, b) => sum + b.allocatedAmount,
-//       0,
-//     );
-//     const totalSpent = budgets.reduce(
-//       (sum, b) => sum + (b.spentAmount || 0),
-//       0,
-//     );
-
-//     res.status(200).json({
-//       success: true,
-//       data: {
-//         totalIncome: totalIncome.length > 0 ? totalIncome[0].total : 0,
-//         totalCount: totalIncome.length > 0 ? totalIncome[0].count : 0,
-//         categoryBreakdown: categoryStats,
-//         monthlyBreakdown: monthlyStats,
-//         currentMonthBudget: {
-//           month: currentMonth,
-//           year: currentYear,
-//           totalBudgeted,
-//           totalSpent,
-//           remainingBudget: totalBudgeted - totalSpent,
-//           percentageUsed:
-//             totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0,
-//         },
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Get income stats error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to fetch income statistics",
-//       error: error.message,
-//     });
-//   }
-// };
-
 // // ============================================================
 // // CONTROLLERS / INCOME.CONTROLLER.JS
 // // ============================================================
 
 // const Income = require("../models/Income");
 // const Budget = require("../models/Budget");
-// const Notification = require("../models/Notification");
 // const mongoose = require("mongoose");
 
 // // ============================================================
@@ -856,15 +41,15 @@
 //       year,
 //     } = req.query;
 
-//     // ============================================================
+//     // ========================================================
 //     // BUILD QUERY
-//     // ============================================================
+//     // ========================================================
 
 //     const query = {};
 
-//     // ------------------------------------------------------------
+//     // --------------------------------------------------------
 //     // USER ID
-//     // ------------------------------------------------------------
+//     // --------------------------------------------------------
 
 //     if (userId) {
 //       if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -877,33 +62,33 @@
 //       query.userId = userId;
 //     }
 
-//     // ------------------------------------------------------------
+//     // --------------------------------------------------------
 //     // EMAIL
-//     // ------------------------------------------------------------
+//     // --------------------------------------------------------
 
 //     if (email) {
-//       query.email = email.trim().toLowerCase();
+//       query.email = String(email).trim().toLowerCase();
 //     }
 
-//     // ------------------------------------------------------------
+//     // --------------------------------------------------------
 //     // CATEGORY
-//     // ------------------------------------------------------------
+//     // --------------------------------------------------------
 
 //     if (category && category.toLowerCase() !== "all") {
-//       query.category = category.trim();
+//       query.category = String(category).trim();
 //     }
 
-//     // ------------------------------------------------------------
+//     // --------------------------------------------------------
 //     // SOURCE
-//     // ------------------------------------------------------------
+//     // --------------------------------------------------------
 
 //     if (source && source.toLowerCase() !== "all") {
-//       query.source = source.trim();
+//       query.source = String(source).trim();
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // DATE FILTER
-//     // ============================================================
+//     // ========================================================
 
 //     if (startDate || endDate) {
 //       query.date = {};
@@ -919,7 +104,6 @@
 //         }
 
 //         start.setHours(0, 0, 0, 0);
-
 //         query.date.$gte = start;
 //       }
 
@@ -934,17 +118,16 @@
 //         }
 
 //         end.setHours(23, 59, 59, 999);
-
 //         query.date.$lte = end;
 //       }
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // SEARCH
-//     // ============================================================
+//     // ========================================================
 
-//     if (search && search.trim()) {
-//       const searchValue = search.trim();
+//     if (search && String(search).trim()) {
+//       const searchValue = String(search).trim();
 
 //       query.$or = [
 //         {
@@ -953,28 +136,24 @@
 //             $options: "i",
 //           },
 //         },
-
 //         {
 //           category: {
 //             $regex: searchValue,
 //             $options: "i",
 //           },
 //         },
-
 //         {
 //           source: {
 //             $regex: searchValue,
 //             $options: "i",
 //           },
 //         },
-
 //         {
 //           user: {
 //             $regex: searchValue,
 //             $options: "i",
 //           },
 //         },
-
 //         {
 //           email: {
 //             $regex: searchValue,
@@ -984,18 +163,18 @@
 //       ];
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // FETCH INCOMES
-//     // ============================================================
+//     // ========================================================
 
 //     const incomes = await Income.find(query).sort({
 //       date: -1,
 //       createdAt: -1,
 //     });
 
-//     // ============================================================
+//     // ========================================================
 //     // MONTH / YEAR
-//     // ============================================================
+//     // ========================================================
 
 //     const currentMonth =
 //       month !== undefined ? Number(month) : new Date().getMonth();
@@ -1003,9 +182,9 @@
 //     const currentYear =
 //       year !== undefined ? Number(year) : new Date().getFullYear();
 
-//     // ============================================================
+//     // ========================================================
 //     // VALIDATE MONTH
-//     // ============================================================
+//     // ========================================================
 
 //     if (
 //       !Number.isInteger(currentMonth) ||
@@ -1018,9 +197,9 @@
 //       });
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // VALIDATE YEAR
-//     // ============================================================
+//     // ========================================================
 
 //     if (!Number.isInteger(currentYear) || currentYear < 2000) {
 //       return res.status(400).json({
@@ -1029,12 +208,9 @@
 //       });
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // BUDGET QUERY
-//     //
-//     // Use userId when available.
-//     // Keep email compatibility.
-//     // ============================================================
+//     // ========================================================
 
 //     const budgetQuery = {
 //       month: currentMonth,
@@ -1044,14 +220,14 @@
 //     if (userId) {
 //       budgetQuery.userId = userId;
 //     } else if (email) {
-//       budgetQuery.email = email.trim().toLowerCase();
+//       budgetQuery.email = String(email).trim().toLowerCase();
 //     }
 
 //     const budgets = await Budget.find(budgetQuery);
 
-//     // ============================================================
+//     // ========================================================
 //     // MONTHLY INCOME
-//     // ============================================================
+//     // ========================================================
 
 //     const monthIncomes = incomes.filter((income) => {
 //       const incomeDate = new Date(income.date);
@@ -1067,9 +243,9 @@
 //       0,
 //     );
 
-//     // ============================================================
+//     // ========================================================
 //     // BUDGET TOTALS
-//     // ============================================================
+//     // ========================================================
 
 //     const totalBudgeted = budgets.reduce(
 //       (sum, budget) => sum + Number(budget.allocatedAmount || 0),
@@ -1086,22 +262,21 @@
 //       0,
 //     );
 
-//     // ============================================================
+//     // ========================================================
 //     // SAVINGS RATE
-//     // ============================================================
+//     // ========================================================
 
 //     const savingsRate =
 //       totalMonthlyIncome > 0
 //         ? ((totalMonthlyIncome - totalSpent) / totalMonthlyIncome) * 100
 //         : 0;
 
-//     // ============================================================
+//     // ========================================================
 //     // CATEGORY SUMMARY
-//     // ============================================================
+//     // ========================================================
 
 //     const budgetSummary = budgets.map((budget) => ({
 //       id: budget._id,
-
 //       category: budget.category,
 
 //       allocated: Number(budget.allocatedAmount || 0),
@@ -1115,32 +290,24 @@
 //       status: budget.status || "on-track",
 
 //       month: budget.month,
-
 //       year: budget.year,
 //     }));
 
-//     // ============================================================
+//     // ========================================================
 //     // RESPONSE
-//     // ============================================================
+//     // ========================================================
 
 //     return res.status(200).json({
 //       success: true,
-
 //       count: incomes.length,
-
 //       data: incomes,
 
 //       budgetSummary: {
 //         totalBudgeted,
-
 //         totalSpent,
-
 //         totalRemaining,
-
 //         totalMonthlyIncome,
-
 //         savingsRate: Number(savingsRate.toFixed(2)),
-
 //         categories: budgetSummary,
 //       },
 //     });
@@ -1149,9 +316,7 @@
 
 //     return res.status(500).json({
 //       success: false,
-
 //       message: "Failed to fetch incomes",
-
 //       error: error.message,
 //     });
 //   }
@@ -1159,11 +324,21 @@
 
 // // ============================================================
 // // GET SINGLE INCOME
+// // @route GET /api/incomes/:id
 // // ============================================================
 
 // exports.getIncome = async (req, res) => {
 //   try {
-//     const income = await Income.findById(req.params.id);
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid income ID",
+//       });
+//     }
+
+//     const income = await Income.findById(id);
 
 //     if (!income) {
 //       return res.status(404).json({
@@ -1181,9 +356,7 @@
 
 //     return res.status(500).json({
 //       success: false,
-
 //       message: "Failed to fetch income",
-
 //       error: error.message,
 //     });
 //   }
@@ -1191,8 +364,8 @@
 
 // // ============================================================
 // // CREATE INCOME
+// // @route POST /api/incomes
 // // ============================================================
-
 
 // exports.createIncome = async (req, res) => {
 //   try {
@@ -1244,27 +417,35 @@
 //       });
 //     }
 
-//     const normalizedEmail = email.trim().toLowerCase();
+//     const incomeDate = new Date(date);
+
+//     if (Number.isNaN(incomeDate.getTime())) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid income date",
+//       });
+//     }
+
+//     const normalizedEmail = String(email).trim().toLowerCase();
 
 //     // ========================================================
 //     // CREATE INCOME
 //     // ========================================================
 
 //     const income = await Income.create({
-//       description: description.trim(),
+//       description: String(description).trim(),
 
-//       category: category.trim(),
+//       category: String(category).trim(),
 
-//       source: source ? source.trim() : "",
+//       source: source ? String(source).trim() : "",
 
 //       amount: numericAmount,
 
-//       // IMPORTANT
 //       remainingAmount: numericAmount,
 
-//       date: new Date(date),
+//       date: incomeDate,
 
-//       user: user.trim(),
+//       user: String(user).trim(),
 
 //       userId,
 
@@ -1277,6 +458,9 @@
 
 //     // ========================================================
 //     // NOTIFICATION
+//     //
+//     // IMPORTANT:
+//     // These fields match the corrected createNotification.js
 //     // ========================================================
 
 //     await createNotification({
@@ -1286,18 +470,19 @@
 //       title: "💰 Income Added",
 
 //       message:
-//         `Income of RWF ` +
-//         `${numericAmount.toLocaleString()} ` +
+//         `Income of RWF ${numericAmount.toLocaleString()} ` +
 //         `was added to your account.`,
 
-//       type: "income",
-
-//       severity: "low",
+//       type: "info",
 
 //       referenceId: income._id,
 
 //       referenceModel: "Income",
 //     });
+
+//     // ========================================================
+//     // RESPONSE
+//     // ========================================================
 
 //     return res.status(201).json({
 //       success: true,
@@ -1305,7 +490,15 @@
 //       data: income,
 //     });
 //   } catch (error) {
-//     console.error("Create income error:", error);
+//     console.error("❌ Create income error:", error);
+
+//     if (error.name === "ValidationError") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Income validation failed",
+//         errors: Object.values(error.errors).map((err) => err.message),
+//       });
+//     }
 
 //     return res.status(500).json({
 //       success: false,
@@ -1317,6 +510,7 @@
 
 // // ============================================================
 // // GET INCOMES BY EMAIL
+// // @route GET /api/incomes/email/:email
 // // ============================================================
 
 // exports.getIncomesByEmail = async (req, res) => {
@@ -1330,7 +524,7 @@
 //       });
 //     }
 
-//     const normalizedEmail = email.trim().toLowerCase();
+//     const normalizedEmail = String(email).trim().toLowerCase();
 
 //     const incomes = await Income.find({
 //       email: normalizedEmail,
@@ -1341,11 +535,8 @@
 
 //     return res.status(200).json({
 //       success: true,
-
 //       message: "Incomes retrieved successfully",
-
 //       count: incomes.length,
-
 //       data: incomes,
 //     });
 //   } catch (error) {
@@ -1353,9 +544,7 @@
 
 //     return res.status(500).json({
 //       success: false,
-
 //       message: "Failed to retrieve incomes",
-
 //       error: error.message,
 //     });
 //   }
@@ -1363,6 +552,7 @@
 
 // // ============================================================
 // // GET INCOMES BY USER ID
+// // @route GET /api/incomes/user/:userId
 // // ============================================================
 
 // exports.getIncomesByUserId = async (req, res) => {
@@ -1385,11 +575,8 @@
 
 //     return res.status(200).json({
 //       success: true,
-
 //       message: "Incomes retrieved successfully",
-
 //       count: incomes.length,
-
 //       data: incomes,
 //     });
 //   } catch (error) {
@@ -1397,9 +584,7 @@
 
 //     return res.status(500).json({
 //       success: false,
-
 //       message: "Failed to retrieve incomes",
-
 //       error: error.message,
 //     });
 //   }
@@ -1407,11 +592,21 @@
 
 // // ============================================================
 // // UPDATE INCOME
+// // @route PUT /api/incomes/:id
 // // ============================================================
 
 // exports.updateIncome = async (req, res) => {
 //   try {
-//     const income = await Income.findById(req.params.id);
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid income ID",
+//       });
+//     }
+
+//     const income = await Income.findById(id);
 
 //     if (!income) {
 //       return res.status(404).json({
@@ -1420,22 +615,19 @@
 //       });
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // SAVE ORIGINAL VALUES
-//     // ============================================================
+//     // ========================================================
 
 //     const oldAmount = Number(income.amount) || 0;
 
 //     const oldRemaining = Number(income.remainingAmount) || 0;
 
-//     // Money already consumed by expenses.
 //     const oldUsed = Math.max(oldAmount - oldRemaining, 0);
 
-//     // ============================================================
-//     // ONLY UPDATE ALLOWED FIELDS
-//     //
-//     // Do NOT allow userId/email to be changed accidentally.
-//     // ============================================================
+//     // ========================================================
+//     // ONLY ALLOW SAFE FIELDS TO BE UPDATED
+//     // ========================================================
 
 //     const {
 //       description,
@@ -1448,59 +640,79 @@
 //       frequency,
 //     } = req.body;
 
+//     // --------------------------------------------------------
+//     // DESCRIPTION
+//     // --------------------------------------------------------
+
 //     if (description !== undefined) {
-//       if (!String(description).trim()) {
+//       const value = String(description).trim();
+
+//       if (!value) {
 //         return res.status(400).json({
 //           success: false,
 //           message: "Description cannot be empty",
 //         });
 //       }
 
-//       income.description = String(description).trim();
+//       income.description = value;
 //     }
 
+//     // --------------------------------------------------------
+//     // CATEGORY
+//     // --------------------------------------------------------
+
 //     if (category !== undefined) {
-//       if (!String(category).trim()) {
+//       const value = String(category).trim();
+
+//       if (!value) {
 //         return res.status(400).json({
 //           success: false,
 //           message: "Category cannot be empty",
 //         });
 //       }
 
-//       income.category = String(category).trim();
+//       income.category = value;
 //     }
+
+//     // --------------------------------------------------------
+//     // SOURCE
+//     // --------------------------------------------------------
 
 //     if (source !== undefined) {
 //       income.source = String(source || "").trim();
 //     }
 
-//     // ============================================================
-//     // AMOUNT UPDATE
-//     // ============================================================
+//     // ========================================================
+//     // AMOUNT
+//     // ========================================================
 
 //     if (amount !== undefined) {
 //       const newAmount = Number(amount);
 
-//       if (
-//         !Number.isFinite(newAmount) ||
-//         !Number.isInteger(newAmount) ||
-//         newAmount <= 0
-//       ) {
+//       if (!Number.isFinite(newAmount) || newAmount <= 0) {
 //         return res.status(400).json({
 //           success: false,
-//           message: "Amount must be a positive whole number",
+//           message: "Amount must be greater than zero",
+//         });
+//       }
+
+//       if (newAmount < oldUsed) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "New amount cannot be less than the amount already used",
+//           amountAlreadyUsed: oldUsed,
 //         });
 //       }
 
 //       income.amount = newAmount;
 
-//       // Preserve money already used by expenses.
-//       income.remainingAmount = Math.max(newAmount - oldUsed, 0);
+//       // Preserve money already consumed by expenses.
+//       income.remainingAmount = newAmount - oldUsed;
 //     }
 
-//     // ============================================================
-//     // DATE UPDATE
-//     // ============================================================
+//     // ========================================================
+//     // DATE
+//     // ========================================================
 
 //     if (date !== undefined) {
 //       const newDate = new Date(date);
@@ -1515,40 +727,48 @@
 //       income.date = newDate;
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // USER DISPLAY NAME
-//     // ============================================================
+//     // ========================================================
 
 //     if (user !== undefined) {
-//       income.user = String(user || "").trim();
+//       const value = String(user).trim();
+
+//       if (!value) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "User cannot be empty",
+//         });
+//       }
+
+//       income.user = value;
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // RECURRING
-//     // ============================================================
+//     // ========================================================
 
 //     if (isRecurring !== undefined) {
-//       income.isRecurring = Boolean(isRecurring);
+//       income.isRecurring = isRecurring === true || isRecurring === "true";
 //     }
 
 //     if (frequency !== undefined) {
 //       income.frequency = frequency;
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // SAVE
-//     // ============================================================
+//     // ========================================================
 
 //     await income.save();
 
-//     // ============================================================
+//     // ========================================================
 //     // NOTIFICATION
-//     // ============================================================
+//     // ========================================================
 
-//     const notification = await createNotification({
-//       userEmail: income.email,
-
+//     await createNotification({
 //       userId: income.userId,
+//       email: income.email,
 
 //       title: "📝 Income Updated",
 
@@ -1556,37 +776,21 @@
 //         `${income.category} income has been updated to ` +
 //         `RWF ${Number(income.amount).toLocaleString()}.`,
 
-//       type: "income",
+//       type: "info",
 
-//       severity: "low",
+//       referenceId: income._id,
 
-//       relatedId: income._id,
-
-//       relatedType: "income",
-
-//       actionLink: `/incomes/${income._id}`,
-
-//       metadata: {
-//         incomeId: income._id,
-
-//         amount: income.amount,
-
-//         remainingAmount: income.remainingAmount,
-
-//         category: income.category,
-
-//         source: income.source,
-//       },
+//       referenceModel: "Income",
 //     });
+
+//     // ========================================================
+//     // RESPONSE
+//     // ========================================================
 
 //     return res.status(200).json({
 //       success: true,
-
 //       message: "Income updated successfully",
-
 //       data: income,
-
-//       notification,
 //     });
 //   } catch (error) {
 //     console.error("❌ Update income error:", error);
@@ -1594,18 +798,14 @@
 //     if (error.name === "ValidationError") {
 //       return res.status(400).json({
 //         success: false,
-
 //         message: "Income validation failed",
-
 //         errors: Object.values(error.errors).map((err) => err.message),
 //       });
 //     }
 
 //     return res.status(500).json({
 //       success: false,
-
 //       message: "Failed to update income",
-
 //       error: error.message,
 //     });
 //   }
@@ -1613,11 +813,21 @@
 
 // // ============================================================
 // // DELETE INCOME
+// // @route DELETE /api/incomes/:id
 // // ============================================================
 
 // exports.deleteIncome = async (req, res) => {
 //   try {
-//     const income = await Income.findById(req.params.id);
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid income ID",
+//       });
+//     }
+
+//     const income = await Income.findById(id);
 
 //     if (!income) {
 //       return res.status(404).json({
@@ -1626,37 +836,30 @@
 //       });
 //     }
 
-//     // ============================================================
-//     // IMPORTANT
-//     //
-//     // Do NOT modify Budget.spentAmount here.
-//     //
-//     // Income does not represent budget spending.
-//     // Expenses are responsible for budget.spentAmount.
-//     // ============================================================
+//     // ========================================================
+//     // SAVE INFORMATION BEFORE DELETE
+//     // ========================================================
 
 //     const incomeId = income._id;
-
 //     const incomeEmail = income.email;
-
 //     const incomeUserId = income.userId;
-
 //     const incomeDescription = income.description;
-
 //     const incomeCategory = income.category;
-
 //     const incomeAmount = Number(income.amount) || 0;
+
+//     // ========================================================
+//     // DELETE
+//     // ========================================================
 
 //     await income.deleteOne();
 
-//     // ============================================================
+//     // ========================================================
 //     // NOTIFICATION
-//     // ============================================================
+//     // ========================================================
 
-//     const notification = await createNotification({
-//       userEmail: incomeEmail,
-
+//     await createNotification({
 //       userId: incomeUserId,
+//       email: incomeEmail,
 
 //       title: "🗑️ Income Deleted",
 
@@ -1665,40 +868,27 @@
 //         `${incomeAmount.toLocaleString()} ` +
 //         `(${incomeDescription}) was deleted.`,
 
-//       type: "income",
+//       type: "warning",
 
-//       severity: "medium",
+//       referenceId: incomeId,
 
-//       relatedId: incomeId,
-
-//       relatedType: "income",
-
-//       actionLink: "/incomes",
-
-//       metadata: {
-//         incomeId,
-
-//         amount: incomeAmount,
-
-//         category: incomeCategory,
-//       },
+//       referenceModel: "Income",
 //     });
+
+//     // ========================================================
+//     // RESPONSE
+//     // ========================================================
 
 //     return res.status(200).json({
 //       success: true,
-
 //       message: "Income deleted successfully",
-
-//       notification,
 //     });
 //   } catch (error) {
 //     console.error("❌ Delete income error:", error);
 
 //     return res.status(500).json({
 //       success: false,
-
 //       message: "Failed to delete income",
-
 //       error: error.message,
 //     });
 //   }
@@ -1706,15 +896,16 @@
 
 // // ============================================================
 // // GET BUDGET SUMMARY
+// // @route GET /api/incomes/budget-summary
 // // ============================================================
 
 // exports.getBudgetSummary = async (req, res) => {
 //   try {
 //     const { userId, email, month, year } = req.query;
 
-//     // ============================================================
+//     // ========================================================
 //     // OWNERSHIP
-//     // ============================================================
+//     // ========================================================
 
 //     if (!userId && !email && (!req.user || !req.user.email)) {
 //       return res.status(400).json({
@@ -1723,7 +914,7 @@
 //       });
 //     }
 
-//     let queryOwner = {};
+//     const queryOwner = {};
 
 //     if (userId) {
 //       if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -1735,14 +926,16 @@
 
 //       queryOwner.userId = userId;
 //     } else {
-//       const userEmail = (email || req.user.email).trim().toLowerCase();
+//       const userEmail = String(email || req.user.email)
+//         .trim()
+//         .toLowerCase();
 
 //       queryOwner.email = userEmail;
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // MONTH / YEAR
-//     // ============================================================
+//     // ========================================================
 
 //     const currentMonth =
 //       month !== undefined ? Number(month) : new Date().getMonth();
@@ -1768,21 +961,19 @@
 //       });
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // BUDGETS
-//     // ============================================================
+//     // ========================================================
 
 //     const budgets = await Budget.find({
 //       ...queryOwner,
-
 //       month: currentMonth,
-
 //       year: currentYear,
 //     });
 
-//     // ============================================================
+//     // ========================================================
 //     // INCOME DATE RANGE
-//     // ============================================================
+//     // ========================================================
 
 //     const startDate = new Date(currentYear, currentMonth, 1);
 
@@ -1790,25 +981,24 @@
 
 //     const incomes = await Income.find({
 //       ...queryOwner,
-
 //       date: {
 //         $gte: startDate,
 //         $lt: endDate,
 //       },
 //     });
 
-//     // ============================================================
+//     // ========================================================
 //     // TOTAL INCOME
-//     // ============================================================
+//     // ========================================================
 
 //     const totalIncome = incomes.reduce(
 //       (sum, income) => sum + Number(income.amount || 0),
 //       0,
 //     );
 
-//     // ============================================================
+//     // ========================================================
 //     // BUDGET TOTALS
-//     // ============================================================
+//     // ========================================================
 
 //     const totalBudgeted = budgets.reduce(
 //       (sum, budget) => sum + Number(budget.allocatedAmount || 0),
@@ -1828,9 +1018,9 @@
 //     const overallPercentage =
 //       totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
 
-//     // ============================================================
+//     // ========================================================
 //     // CATEGORY BREAKDOWN
-//     // ============================================================
+//     // ========================================================
 
 //     const categoryBreakdown = budgets.map((budget) => {
 //       const categoryIncome = incomes
@@ -1854,9 +1044,9 @@
 //       };
 //     });
 
-//     // ============================================================
+//     // ========================================================
 //     // STATUS
-//     // ============================================================
+//     // ========================================================
 
 //     let status = "on-track";
 
@@ -1868,24 +1058,20 @@
 //       status = "under-budget";
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // RESPONSE
-//     // ============================================================
+//     // ========================================================
 
 //     return res.status(200).json({
 //       success: true,
 
 //       data: {
 //         month: currentMonth,
-
 //         year: currentYear,
 
 //         totalIncome,
-
 //         totalBudgeted,
-
 //         totalSpent,
-
 //         totalRemaining,
 
 //         overallPercentage: Number(overallPercentage.toFixed(2)),
@@ -1900,9 +1086,7 @@
 
 //     return res.status(500).json({
 //       success: false,
-
 //       message: "Failed to fetch budget summary",
-
 //       error: error.message,
 //     });
 //   }
@@ -1910,25 +1094,25 @@
 
 // // ============================================================
 // // GET INCOME STATISTICS
+// // @route GET /api/incomes/stats
 // // ============================================================
 
 // exports.getIncomeStats = async (req, res) => {
 //   try {
 //     const { userId, email } = req.query;
 
-//     // ============================================================
+//     // ========================================================
 //     // OWNERSHIP
-//     // ============================================================
+//     // ========================================================
 
 //     if (!userId && !email && (!req.user || !req.user.email)) {
 //       return res.status(400).json({
 //         success: false,
-
 //         message: "userId or email is required",
 //       });
 //     }
 
-//     let query = {};
+//     const query = {};
 
 //     if (userId) {
 //       if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -1940,20 +1124,21 @@
 
 //       query.userId = userId;
 //     } else {
-//       const userEmail = (email || req.user.email).trim().toLowerCase();
+//       const userEmail = String(email || req.user.email)
+//         .trim()
+//         .toLowerCase();
 
 //       query.email = userEmail;
 //     }
 
-//     // ============================================================
+//     // ========================================================
 //     // TOTAL INCOME
-//     // ============================================================
+//     // ========================================================
 
 //     const totalIncome = await Income.aggregate([
 //       {
 //         $match: query,
 //       },
-
 //       {
 //         $group: {
 //           _id: null,
@@ -1969,15 +1154,14 @@
 //       },
 //     ]);
 
-//     // ============================================================
+//     // ========================================================
 //     // INCOME BY CATEGORY
-//     // ============================================================
+//     // ========================================================
 
 //     const categoryStats = await Income.aggregate([
 //       {
 //         $match: query,
 //       },
-
 //       {
 //         $group: {
 //           _id: "$category",
@@ -1991,7 +1175,6 @@
 //           },
 //         },
 //       },
-
 //       {
 //         $sort: {
 //           total: -1,
@@ -1999,9 +1182,9 @@
 //       },
 //     ]);
 
-//     // ============================================================
+//     // ========================================================
 //     // LAST 12 MONTHS
-//     // ============================================================
+//     // ========================================================
 
 //     const twelveMonthsAgo = new Date();
 
@@ -2017,7 +1200,6 @@
 //           },
 //         },
 //       },
-
 //       {
 //         $group: {
 //           _id: {
@@ -2039,7 +1221,6 @@
 //           },
 //         },
 //       },
-
 //       {
 //         $sort: {
 //           "_id.year": -1,
@@ -2048,21 +1229,24 @@
 //       },
 //     ]);
 
-//     // ============================================================
+//     // ========================================================
 //     // CURRENT MONTH BUDGET
-//     // ============================================================
+//     // ========================================================
 
 //     const currentMonth = new Date().getMonth();
 
 //     const currentYear = new Date().getFullYear();
 
 //     const budgetQuery = {
-//       ...query,
-
 //       month: currentMonth,
-
 //       year: currentYear,
 //     };
+
+//     if (userId) {
+//       budgetQuery.userId = userId;
+//     } else {
+//       budgetQuery.email = query.email;
+//     }
 
 //     const budgets = await Budget.find(budgetQuery);
 
@@ -2084,9 +1268,9 @@
 //     const percentageUsed =
 //       totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
 
-//     // ============================================================
+//     // ========================================================
 //     // RESPONSE
-//     // ============================================================
+//     // ========================================================
 
 //     return res.status(200).json({
 //       success: true,
@@ -2102,13 +1286,10 @@
 
 //         currentMonthBudget: {
 //           month: currentMonth,
-
 //           year: currentYear,
 
 //           totalBudgeted,
-
 //           totalSpent,
-
 //           remainingBudget,
 
 //           percentageUsed: Number(percentageUsed.toFixed(2)),
@@ -2120,41 +1301,56 @@
 
 //     return res.status(500).json({
 //       success: false,
-
 //       message: "Failed to fetch income statistics",
-
 //       error: error.message,
 //     });
 //   }
 // };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ============================================================
 // CONTROLLERS / INCOME.CONTROLLER.JS
 // ============================================================
 
-const Income = require("../models/Income");
-const Budget = require("../models/Budget");
 const mongoose = require("mongoose");
 
-// ============================================================
-// NOTIFICATION HELPER
-// ============================================================
+const Income = require("../models/Income");
+const Budget = require("../models/Budget");
 
 const createNotification = require("../utils/createNotification");
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+const normalizeEmail = (email) => {
+  return String(email || "")
+    .trim()
+    .toLowerCase();
+};
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
+const validateMonth = (month) => {
+  const parsedMonth = Number(month);
+
+  if (!Number.isInteger(parsedMonth) || parsedMonth < 0 || parsedMonth > 11) {
+    return null;
+  }
+
+  return parsedMonth;
+};
+
+const validateYear = (year) => {
+  const parsedYear = Number(year);
+
+  if (!Number.isInteger(parsedYear) || parsedYear < 2000) {
+    return null;
+  }
+
+  return parsedYear;
+};
 
 // ============================================================
 // GET ALL INCOMES
@@ -2196,7 +1392,7 @@ exports.getIncomes = async (req, res) => {
     // --------------------------------------------------------
 
     if (userId) {
-      if (!mongoose.Types.ObjectId.isValid(userId)) {
+      if (!isValidObjectId(userId)) {
         return res.status(400).json({
           success: false,
           message: "Invalid userId",
@@ -2211,14 +1407,14 @@ exports.getIncomes = async (req, res) => {
     // --------------------------------------------------------
 
     if (email) {
-      query.email = String(email).trim().toLowerCase();
+      query.email = normalizeEmail(email);
     }
 
     // --------------------------------------------------------
     // CATEGORY
     // --------------------------------------------------------
 
-    if (category && category.toLowerCase() !== "all") {
+    if (category && String(category).trim().toLowerCase() !== "all") {
       query.category = String(category).trim();
     }
 
@@ -2226,7 +1422,7 @@ exports.getIncomes = async (req, res) => {
     // SOURCE
     // --------------------------------------------------------
 
-    if (source && source.toLowerCase() !== "all") {
+    if (source && String(source).trim().toLowerCase() !== "all") {
       query.source = String(source).trim();
     }
 
@@ -2236,6 +1432,10 @@ exports.getIncomes = async (req, res) => {
 
     if (startDate || endDate) {
       query.date = {};
+
+      // ------------------------------------------------------
+      // START DATE
+      // ------------------------------------------------------
 
       if (startDate) {
         const start = new Date(startDate);
@@ -2248,8 +1448,13 @@ exports.getIncomes = async (req, res) => {
         }
 
         start.setHours(0, 0, 0, 0);
+
         query.date.$gte = start;
       }
+
+      // ------------------------------------------------------
+      // END DATE
+      // ------------------------------------------------------
 
       if (endDate) {
         const end = new Date(endDate);
@@ -2262,6 +1467,7 @@ exports.getIncomes = async (req, res) => {
         }
 
         end.setHours(23, 59, 59, 999);
+
         query.date.$lte = end;
       }
     }
@@ -2321,38 +1527,27 @@ exports.getIncomes = async (req, res) => {
     // ========================================================
 
     const currentMonth =
-      month !== undefined
-        ? Number(month)
-        : new Date().getMonth();
+      month !== undefined ? validateMonth(month) : new Date().getMonth();
 
     const currentYear =
-      year !== undefined
-        ? Number(year)
-        : new Date().getFullYear();
+      year !== undefined ? validateYear(year) : new Date().getFullYear();
 
-    // ========================================================
+    // --------------------------------------------------------
     // VALIDATE MONTH
-    // ========================================================
+    // --------------------------------------------------------
 
-    if (
-      !Number.isInteger(currentMonth) ||
-      currentMonth < 0 ||
-      currentMonth > 11
-    ) {
+    if (currentMonth === null) {
       return res.status(400).json({
         success: false,
         message: "Month must be an integer between 0 and 11",
       });
     }
 
-    // ========================================================
+    // --------------------------------------------------------
     // VALIDATE YEAR
-    // ========================================================
+    // --------------------------------------------------------
 
-    if (
-      !Number.isInteger(currentYear) ||
-      currentYear < 2000
-    ) {
+    if (currentYear === null) {
       return res.status(400).json({
         success: false,
         message: "Invalid year",
@@ -2371,9 +1566,7 @@ exports.getIncomes = async (req, res) => {
     if (userId) {
       budgetQuery.userId = userId;
     } else if (email) {
-      budgetQuery.email = String(email)
-        .trim()
-        .toLowerCase();
+      budgetQuery.email = normalizeEmail(email);
     }
 
     const budgets = await Budget.find(budgetQuery);
@@ -2392,9 +1585,17 @@ exports.getIncomes = async (req, res) => {
     });
 
     const totalMonthlyIncome = monthIncomes.reduce(
-      (sum, income) =>
-        sum + Number(income.amount || 0),
-      0
+      (sum, income) => sum + Number(income.amount || 0),
+      0,
+    );
+
+    // ========================================================
+    // AVAILABLE INCOME
+    // ========================================================
+
+    const totalAvailableIncome = monthIncomes.reduce(
+      (sum, income) => sum + Number(income.remainingAmount || 0),
+      0,
     );
 
     // ========================================================
@@ -2402,21 +1603,18 @@ exports.getIncomes = async (req, res) => {
     // ========================================================
 
     const totalBudgeted = budgets.reduce(
-      (sum, budget) =>
-        sum + Number(budget.allocatedAmount || 0),
-      0
+      (sum, budget) => sum + Number(budget.allocatedAmount || 0),
+      0,
     );
 
     const totalSpent = budgets.reduce(
-      (sum, budget) =>
-        sum + Number(budget.spentAmount || 0),
-      0
+      (sum, budget) => sum + Number(budget.spentAmount || 0),
+      0,
     );
 
     const totalRemaining = budgets.reduce(
-      (sum, budget) =>
-        sum + Number(budget.remainingAmount || 0),
-      0
+      (sum, budget) => sum + Number(budget.remainingAmount || 0),
+      0,
     );
 
     // ========================================================
@@ -2425,9 +1623,7 @@ exports.getIncomes = async (req, res) => {
 
     const savingsRate =
       totalMonthlyIncome > 0
-        ? ((totalMonthlyIncome - totalSpent) /
-            totalMonthlyIncome) *
-          100
+        ? ((totalMonthlyIncome - totalSpent) / totalMonthlyIncome) * 100
         : 0;
 
     // ========================================================
@@ -2436,28 +1632,21 @@ exports.getIncomes = async (req, res) => {
 
     const budgetSummary = budgets.map((budget) => ({
       id: budget._id,
+
       category: budget.category,
 
-      allocated: Number(
-        budget.allocatedAmount || 0
-      ),
+      allocated: Number(budget.allocatedAmount || 0),
 
-      spent: Number(
-        budget.spentAmount || 0
-      ),
+      spent: Number(budget.spentAmount || 0),
 
-      remaining: Number(
-        budget.remainingAmount || 0
-      ),
+      remaining: Number(budget.remainingAmount || 0),
 
-      percentageUsed: Number(
-        budget.percentageUsed || 0
-      ),
+      percentageUsed: Number(budget.percentageUsed || 0),
 
-      status:
-        budget.status || "on-track",
+      status: budget.status || "on-track",
 
       month: budget.month,
+
       year: budget.year,
     }));
 
@@ -2467,25 +1656,29 @@ exports.getIncomes = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+
       count: incomes.length,
+
       data: incomes,
 
       budgetSummary: {
         totalBudgeted,
+
         totalSpent,
+
         totalRemaining,
+
         totalMonthlyIncome,
-        savingsRate: Number(
-          savingsRate.toFixed(2)
-        ),
+
+        totalAvailableIncome,
+
+        savingsRate: Number(savingsRate.toFixed(2)),
+
         categories: budgetSummary,
       },
     });
   } catch (error) {
-    console.error(
-      "❌ Get incomes error:",
-      error
-    );
+    console.error("❌ Get incomes error:", error);
 
     return res.status(500).json({
       success: false,
@@ -2504,12 +1697,20 @@ exports.getIncome = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    // ========================================================
+    // VALIDATE ID
+    // ========================================================
+
+    if (!isValidObjectId(id)) {
       return res.status(400).json({
         success: false,
         message: "Invalid income ID",
       });
     }
+
+    // ========================================================
+    // FIND INCOME
+    // ========================================================
 
     const income = await Income.findById(id);
 
@@ -2520,15 +1721,16 @@ exports.getIncome = async (req, res) => {
       });
     }
 
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
     return res.status(200).json({
       success: true,
       data: income,
     });
   } catch (error) {
-    console.error(
-      "❌ Get income error:",
-      error
-    );
+    console.error("❌ Get income error:", error);
 
     return res.status(500).json({
       success: false,
@@ -2559,7 +1761,7 @@ exports.createIncome = async (req, res) => {
     } = req.body;
 
     // ========================================================
-    // VALIDATION
+    // REQUIRED FIELDS
     // ========================================================
 
     if (
@@ -2573,30 +1775,38 @@ exports.createIncome = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "All income fields are required",
+        message:
+          "Description, category, amount, date, user, email and userId are required",
       });
     }
 
-    if (
-      !mongoose.Types.ObjectId.isValid(userId)
-    ) {
+    // ========================================================
+    // USER ID
+    // ========================================================
+
+    if (!isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid userId",
       });
     }
 
+    // ========================================================
+    // AMOUNT
+    // ========================================================
+
     const numericAmount = Number(amount);
 
-    if (
-      !Number.isFinite(numericAmount) ||
-      numericAmount <= 0
-    ) {
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       return res.status(400).json({
         success: false,
         message: "Amount must be greater than zero",
       });
     }
+
+    // ========================================================
+    // DATE
+    // ========================================================
 
     const incomeDate = new Date(date);
 
@@ -2607,22 +1817,42 @@ exports.createIncome = async (req, res) => {
       });
     }
 
-    const normalizedEmail = String(email)
-      .trim()
-      .toLowerCase();
+    // ========================================================
+    // NORMALIZE
+    // ========================================================
+
+    const normalizedEmail = normalizeEmail(email);
+
+    const normalizedDescription = String(description).trim();
+
+    const normalizedCategory = String(category).trim();
+
+    const normalizedSource = source ? String(source).trim() : "";
+
+    if (!normalizedDescription) {
+      return res.status(400).json({
+        success: false,
+        message: "Description cannot be empty",
+      });
+    }
+
+    if (!normalizedCategory) {
+      return res.status(400).json({
+        success: false,
+        message: "Category cannot be empty",
+      });
+    }
 
     // ========================================================
     // CREATE INCOME
     // ========================================================
 
     const income = await Income.create({
-      description: String(description).trim(),
+      description: normalizedDescription,
 
-      category: String(category).trim(),
+      category: normalizedCategory,
 
-      source: source
-        ? String(source).trim()
-        : "",
+      source: normalizedSource,
 
       amount: numericAmount,
 
@@ -2636,34 +1866,39 @@ exports.createIncome = async (req, res) => {
 
       email: normalizedEmail,
 
-      isRecurring: Boolean(isRecurring),
+      isRecurring: isRecurring === true || isRecurring === "true",
 
       frequency: frequency || "monthly",
     });
 
     // ========================================================
     // NOTIFICATION
-    //
-    // IMPORTANT:
-    // These fields match the corrected createNotification.js
     // ========================================================
 
-    await createNotification({
-      userId,
-      email: normalizedEmail,
+    let notification = null;
 
-      title: "💰 Income Added",
+    try {
+      notification = await createNotification({
+        userId,
 
-      message:
-        `Income of RWF ${numericAmount.toLocaleString()} ` +
-        `was added to your account.`,
+        email: normalizedEmail,
 
-      type: "info",
+        title: "💰 Income Added",
 
-      referenceId: income._id,
+        message:
+          `Income of RWF ` +
+          `${numericAmount.toLocaleString()} ` +
+          `was added to your account.`,
 
-      referenceModel: "Income",
-    });
+        type: "info",
+
+        referenceId: income._id,
+
+        referenceModel: "Income",
+      });
+    } catch (notificationError) {
+      console.error("⚠️ Income notification error:", notificationError);
+    }
 
     // ========================================================
     // RESPONSE
@@ -2671,28 +1906,35 @@ exports.createIncome = async (req, res) => {
 
     return res.status(201).json({
       success: true,
+
       message: "Income created successfully",
+
       data: income,
+
+      notification,
     });
   } catch (error) {
-    console.error(
-      "❌ Create income error:",
-      error
-    );
+    console.error("❌ Create income error:", error);
+
+    // ========================================================
+    // VALIDATION ERROR
+    // ========================================================
 
     if (error.name === "ValidationError") {
       return res.status(400).json({
         success: false,
+
         message: "Income validation failed",
-        errors: Object.values(
-          error.errors
-        ).map((err) => err.message),
+
+        errors: Object.values(error.errors).map((err) => err.message),
       });
     }
 
     return res.status(500).json({
       success: false,
+
       message: "Failed to create income",
+
       error: error.message,
     });
   }
@@ -2707,6 +1949,10 @@ exports.getIncomesByEmail = async (req, res) => {
   try {
     const { email } = req.params;
 
+    // ========================================================
+    // VALIDATE EMAIL
+    // ========================================================
+
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -2714,9 +1960,11 @@ exports.getIncomesByEmail = async (req, res) => {
       });
     }
 
-    const normalizedEmail = String(email)
-      .trim()
-      .toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
+
+    // ========================================================
+    // FETCH
+    // ========================================================
 
     const incomes = await Income.find({
       email: normalizedEmail,
@@ -2725,21 +1973,27 @@ exports.getIncomesByEmail = async (req, res) => {
       createdAt: -1,
     });
 
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
     return res.status(200).json({
       success: true,
+
       message: "Incomes retrieved successfully",
+
       count: incomes.length,
+
       data: incomes,
     });
   } catch (error) {
-    console.error(
-      "❌ Get incomes by email error:",
-      error
-    );
+    console.error("❌ Get incomes by email error:", error);
 
     return res.status(500).json({
       success: false,
+
       message: "Failed to retrieve incomes",
+
       error: error.message,
     });
   }
@@ -2754,15 +2008,20 @@ exports.getIncomesByUserId = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    if (
-      !userId ||
-      !mongoose.Types.ObjectId.isValid(userId)
-    ) {
+    // ========================================================
+    // VALIDATE USER ID
+    // ========================================================
+
+    if (!userId || !isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid userId",
       });
     }
+
+    // ========================================================
+    // FETCH
+    // ========================================================
 
     const incomes = await Income.find({
       userId,
@@ -2771,21 +2030,27 @@ exports.getIncomesByUserId = async (req, res) => {
       createdAt: -1,
     });
 
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
     return res.status(200).json({
       success: true,
+
       message: "Incomes retrieved successfully",
+
       count: incomes.length,
+
       data: incomes,
     });
   } catch (error) {
-    console.error(
-      "❌ Get incomes by userId error:",
-      error
-    );
+    console.error("❌ Get incomes by userId error:", error);
 
     return res.status(500).json({
       success: false,
+
       message: "Failed to retrieve incomes",
+
       error: error.message,
     });
   }
@@ -2800,12 +2065,20 @@ exports.updateIncome = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    // ========================================================
+    // VALIDATE ID
+    // ========================================================
+
+    if (!isValidObjectId(id)) {
       return res.status(400).json({
         success: false,
         message: "Invalid income ID",
       });
     }
+
+    // ========================================================
+    // FIND INCOME
+    // ========================================================
 
     const income = await Income.findById(id);
 
@@ -2817,22 +2090,20 @@ exports.updateIncome = async (req, res) => {
     }
 
     // ========================================================
-    // SAVE ORIGINAL VALUES
+    // ORIGINAL VALUES
     // ========================================================
 
-    const oldAmount =
-      Number(income.amount) || 0;
+    const oldAmount = Number(income.amount) || 0;
 
-    const oldRemaining =
-      Number(income.remainingAmount) || 0;
+    const oldRemaining = Number(income.remainingAmount) || 0;
 
-    const oldUsed = Math.max(
-      oldAmount - oldRemaining,
-      0
-    );
+    // Amount already consumed
+    // by expenses.
+
+    const oldUsed = Math.max(oldAmount - oldRemaining, 0);
 
     // ========================================================
-    // ONLY ALLOW SAFE FIELDS TO BE UPDATED
+    // ALLOWED FIELDS
     // ========================================================
 
     const {
@@ -2846,9 +2117,9 @@ exports.updateIncome = async (req, res) => {
       frequency,
     } = req.body;
 
-    // --------------------------------------------------------
+    // ========================================================
     // DESCRIPTION
-    // --------------------------------------------------------
+    // ========================================================
 
     if (description !== undefined) {
       const value = String(description).trim();
@@ -2863,9 +2134,9 @@ exports.updateIncome = async (req, res) => {
       income.description = value;
     }
 
-    // --------------------------------------------------------
+    // ========================================================
     // CATEGORY
-    // --------------------------------------------------------
+    // ========================================================
 
     if (category !== undefined) {
       const value = String(category).trim();
@@ -2880,14 +2151,12 @@ exports.updateIncome = async (req, res) => {
       income.category = value;
     }
 
-    // --------------------------------------------------------
+    // ========================================================
     // SOURCE
-    // --------------------------------------------------------
+    // ========================================================
 
     if (source !== undefined) {
-      income.source = String(
-        source || ""
-      ).trim();
+      income.source = String(source || "").trim();
     }
 
     // ========================================================
@@ -2897,31 +2166,33 @@ exports.updateIncome = async (req, res) => {
     if (amount !== undefined) {
       const newAmount = Number(amount);
 
-      if (
-        !Number.isFinite(newAmount) ||
-        newAmount <= 0
-      ) {
+      if (!Number.isFinite(newAmount) || newAmount <= 0) {
         return res.status(400).json({
           success: false,
-          message:
-            "Amount must be greater than zero",
+          message: "Amount must be greater than zero",
         });
       }
+
+      // ------------------------------------------------------
+      // NEVER ALLOW THE NEW INCOME TO BECOME LESS THAN
+      // MONEY ALREADY CONSUMED BY EXPENSES.
+      // ------------------------------------------------------
 
       if (newAmount < oldUsed) {
         return res.status(400).json({
           success: false,
-          message:
-            "New amount cannot be less than the amount already used",
+
+          message: "New amount cannot be less than the amount already used",
+
           amountAlreadyUsed: oldUsed,
         });
       }
 
       income.amount = newAmount;
 
-      // Preserve money already consumed by expenses.
-      income.remainingAmount =
-        newAmount - oldUsed;
+      // Preserve consumed amount.
+
+      income.remainingAmount = newAmount - oldUsed;
     }
 
     // ========================================================
@@ -2963,10 +2234,12 @@ exports.updateIncome = async (req, res) => {
     // ========================================================
 
     if (isRecurring !== undefined) {
-      income.isRecurring =
-        isRecurring === true ||
-        isRecurring === "true";
+      income.isRecurring = isRecurring === true || isRecurring === "true";
     }
+
+    // ========================================================
+    // FREQUENCY
+    // ========================================================
 
     if (frequency !== undefined) {
       income.frequency = frequency;
@@ -2982,24 +2255,29 @@ exports.updateIncome = async (req, res) => {
     // NOTIFICATION
     // ========================================================
 
-    await createNotification({
-      userId: income.userId,
-      email: income.email,
+    let notification = null;
 
-      title: "📝 Income Updated",
+    try {
+      notification = await createNotification({
+        userId: income.userId,
 
-      message:
-        `${income.category} income has been updated to ` +
-        `RWF ${Number(
-          income.amount
-        ).toLocaleString()}.`,
+        email: income.email,
 
-      type: "info",
+        title: "📝 Income Updated",
 
-      referenceId: income._id,
+        message:
+          `${income.category} income has been updated to ` +
+          `RWF ${Number(income.amount).toLocaleString()}.`,
 
-      referenceModel: "Income",
-    });
+        type: "info",
+
+        referenceId: income._id,
+
+        referenceModel: "Income",
+      });
+    } catch (notificationError) {
+      console.error("⚠️ Income update notification error:", notificationError);
+    }
 
     // ========================================================
     // RESPONSE
@@ -3007,28 +2285,35 @@ exports.updateIncome = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+
       message: "Income updated successfully",
+
       data: income,
+
+      notification,
     });
   } catch (error) {
-    console.error(
-      "❌ Update income error:",
-      error
-    );
+    console.error("❌ Update income error:", error);
+
+    // ========================================================
+    // VALIDATION ERROR
+    // ========================================================
 
     if (error.name === "ValidationError") {
       return res.status(400).json({
         success: false,
+
         message: "Income validation failed",
-        errors: Object.values(
-          error.errors
-        ).map((err) => err.message),
+
+        errors: Object.values(error.errors).map((err) => err.message),
       });
     }
 
     return res.status(500).json({
       success: false,
+
       message: "Failed to update income",
+
       error: error.message,
     });
   }
@@ -3043,35 +2328,76 @@ exports.deleteIncome = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    // ========================================================
+    // VALIDATE ID
+    // ========================================================
+
+    if (!isValidObjectId(id)) {
       return res.status(400).json({
         success: false,
+
         message: "Invalid income ID",
       });
     }
+
+    // ========================================================
+    // FIND INCOME
+    // ========================================================
 
     const income = await Income.findById(id);
 
     if (!income) {
       return res.status(404).json({
         success: false,
+
         message: "Income not found",
       });
     }
 
     // ========================================================
-    // SAVE INFORMATION BEFORE DELETE
+    // CHECK USED MONEY
+    // ========================================================
+
+    const incomeAmount = Number(income.amount) || 0;
+
+    const remainingAmount = Number(income.remainingAmount) || 0;
+
+    const usedAmount = Math.max(incomeAmount - remainingAmount, 0);
+
+    // --------------------------------------------------------
+    // IMPORTANT
+    //
+    // If expenses have already consumed part of this income,
+    // deleting the income would make the financial records
+    // inconsistent.
+    // --------------------------------------------------------
+
+    if (usedAmount > 0) {
+      return res.status(409).json({
+        success: false,
+
+        message:
+          "This income cannot be deleted because part of it has already been used by expenses.",
+
+        amountUsed: usedAmount,
+
+        remainingAmount: remainingAmount,
+      });
+    }
+
+    // ========================================================
+    // SAVE INFORMATION
     // ========================================================
 
     const incomeId = income._id;
+
     const incomeEmail = income.email;
+
     const incomeUserId = income.userId;
-    const incomeDescription =
-      income.description;
-    const incomeCategory =
-      income.category;
-    const incomeAmount =
-      Number(income.amount) || 0;
+
+    const incomeDescription = income.description;
+
+    const incomeCategory = income.category;
 
     // ========================================================
     // DELETE
@@ -3083,23 +2409,30 @@ exports.deleteIncome = async (req, res) => {
     // NOTIFICATION
     // ========================================================
 
-    await createNotification({
-      userId: incomeUserId,
-      email: incomeEmail,
+    let notification = null;
 
-      title: "🗑️ Income Deleted",
+    try {
+      notification = await createNotification({
+        userId: incomeUserId,
 
-      message:
-        `${incomeCategory} income of RWF ` +
-        `${incomeAmount.toLocaleString()} ` +
-        `(${incomeDescription}) was deleted.`,
+        email: incomeEmail,
 
-      type: "warning",
+        title: "🗑️ Income Deleted",
 
-      referenceId: incomeId,
+        message:
+          `${incomeCategory} income of RWF ` +
+          `${incomeAmount.toLocaleString()} ` +
+          `(${incomeDescription}) was deleted.`,
 
-      referenceModel: "Income",
-    });
+        type: "warning",
+
+        referenceId: incomeId,
+
+        referenceModel: "Income",
+      });
+    } catch (notificationError) {
+      console.error("⚠️ Income delete notification error:", notificationError);
+    }
 
     // ========================================================
     // RESPONSE
@@ -3107,17 +2440,19 @@ exports.deleteIncome = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+
       message: "Income deleted successfully",
+
+      notification,
     });
   } catch (error) {
-    console.error(
-      "❌ Delete income error:",
-      error
-    );
+    console.error("❌ Delete income error:", error);
 
     return res.status(500).json({
       success: false,
+
       message: "Failed to delete income",
+
       error: error.message,
     });
   }
@@ -3126,40 +2461,38 @@ exports.deleteIncome = async (req, res) => {
 // ============================================================
 // GET BUDGET SUMMARY
 // @route GET /api/incomes/budget-summary
+//
+// Supports:
+// ?userId=...
+// ?email=...
+// ?month=...
+// ?year=...
 // ============================================================
 
 exports.getBudgetSummary = async (req, res) => {
   try {
-    const {
-      userId,
-      email,
-      month,
-      year,
-    } = req.query;
+    const { userId, email, month, year } = req.query;
 
     // ========================================================
     // OWNERSHIP
     // ========================================================
 
-    if (
-      !userId &&
-      !email &&
-      (!req.user || !req.user.email)
-    ) {
+    if (!userId && !email && (!req.user || !req.user.email)) {
       return res.status(400).json({
         success: false,
+
         message: "userId or email is required",
       });
     }
 
     const queryOwner = {};
 
+    // --------------------------------------------------------
+    // USER ID
+    // --------------------------------------------------------
+
     if (userId) {
-      if (
-        !mongoose.Types.ObjectId.isValid(
-          userId
-        )
-      ) {
+      if (!isValidObjectId(userId)) {
         return res.status(400).json({
           success: false,
           message: "Invalid userId",
@@ -3167,12 +2500,13 @@ exports.getBudgetSummary = async (req, res) => {
       }
 
       queryOwner.userId = userId;
-    } else {
-      const userEmail = String(
-        email || req.user.email
-      )
-        .trim()
-        .toLowerCase();
+    }
+
+    // --------------------------------------------------------
+    // EMAIL
+    // --------------------------------------------------------
+    else {
+      const userEmail = normalizeEmail(email || req.user.email);
 
       queryOwner.email = userEmail;
     }
@@ -3182,33 +2516,23 @@ exports.getBudgetSummary = async (req, res) => {
     // ========================================================
 
     const currentMonth =
-      month !== undefined
-        ? Number(month)
-        : new Date().getMonth();
+      month !== undefined ? validateMonth(month) : new Date().getMonth();
 
     const currentYear =
-      year !== undefined
-        ? Number(year)
-        : new Date().getFullYear();
+      year !== undefined ? validateYear(year) : new Date().getFullYear();
 
-    if (
-      !Number.isInteger(currentMonth) ||
-      currentMonth < 0 ||
-      currentMonth > 11
-    ) {
+    if (currentMonth === null) {
       return res.status(400).json({
         success: false,
-        message:
-          "Month must be an integer between 0 and 11",
+
+        message: "Month must be an integer between 0 and 11",
       });
     }
 
-    if (
-      !Number.isInteger(currentYear) ||
-      currentYear < 2000
-    ) {
+    if (currentYear === null) {
       return res.status(400).json({
         success: false,
+
         message: "Invalid year",
       });
     }
@@ -3219,7 +2543,9 @@ exports.getBudgetSummary = async (req, res) => {
 
     const budgets = await Budget.find({
       ...queryOwner,
+
       month: currentMonth,
+
       year: currentYear,
     });
 
@@ -3227,22 +2553,16 @@ exports.getBudgetSummary = async (req, res) => {
     // INCOME DATE RANGE
     // ========================================================
 
-    const startDate = new Date(
-      currentYear,
-      currentMonth,
-      1
-    );
+    const startDate = new Date(currentYear, currentMonth, 1);
 
-    const endDate = new Date(
-      currentYear,
-      currentMonth + 1,
-      1
-    );
+    const endDate = new Date(currentYear, currentMonth + 1, 1);
 
     const incomes = await Income.find({
       ...queryOwner,
+
       date: {
         $gte: startDate,
+
         $lt: endDate,
       },
     });
@@ -3252,9 +2572,17 @@ exports.getBudgetSummary = async (req, res) => {
     // ========================================================
 
     const totalIncome = incomes.reduce(
-      (sum, income) =>
-        sum + Number(income.amount || 0),
-      0
+      (sum, income) => sum + Number(income.amount || 0),
+      0,
+    );
+
+    // ========================================================
+    // AVAILABLE INCOME
+    // ========================================================
+
+    const availableIncome = incomes.reduce(
+      (sum, income) => sum + Number(income.remainingAmount || 0),
+      0,
     );
 
     // ========================================================
@@ -3262,87 +2590,58 @@ exports.getBudgetSummary = async (req, res) => {
     // ========================================================
 
     const totalBudgeted = budgets.reduce(
-      (sum, budget) =>
-        sum +
-        Number(
-          budget.allocatedAmount || 0
-        ),
-      0
+      (sum, budget) => sum + Number(budget.allocatedAmount || 0),
+      0,
     );
 
     const totalSpent = budgets.reduce(
-      (sum, budget) =>
-        sum +
-        Number(
-          budget.spentAmount || 0
-        ),
-      0
+      (sum, budget) => sum + Number(budget.spentAmount || 0),
+      0,
     );
 
     const totalRemaining = budgets.reduce(
-      (sum, budget) =>
-        sum +
-        Number(
-          budget.remainingAmount || 0
-        ),
-      0
+      (sum, budget) => sum + Number(budget.remainingAmount || 0),
+      0,
     );
 
+    // ========================================================
+    // OVERALL PERCENTAGE
+    // ========================================================
+
     const overallPercentage =
-      totalBudgeted > 0
-        ? (totalSpent / totalBudgeted) *
-          100
-        : 0;
+      totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
 
     // ========================================================
     // CATEGORY BREAKDOWN
     // ========================================================
 
-    const categoryBreakdown =
-      budgets.map((budget) => {
-        const categoryIncome =
-          incomes
-            .filter(
-              (income) =>
-                income.category ===
-                budget.category
-            )
-            .reduce(
-              (sum, income) =>
-                sum +
-                Number(
-                  income.amount || 0
-                ),
-              0
-            );
+    const categoryBreakdown = budgets.map((budget) => {
+      const categoryIncome = incomes
+        .filter((income) => income.category === budget.category)
+        .reduce((sum, income) => sum + Number(income.amount || 0), 0);
 
-        return {
-          category:
-            budget.category,
+      return {
+        id: budget._id,
 
-          budgeted: Number(
-            budget.allocatedAmount || 0
-          ),
+        category: budget.category,
 
-          spent: Number(
-            budget.spentAmount || 0
-          ),
+        budgeted: Number(budget.allocatedAmount || 0),
 
-          remaining: Number(
-            budget.remainingAmount || 0
-          ),
+        spent: Number(budget.spentAmount || 0),
 
-          percentageUsed: Number(
-            budget.percentageUsed || 0
-          ),
+        remaining: Number(budget.remainingAmount || 0),
 
-          status:
-            budget.status ||
-            "on-track",
+        percentageUsed: Number(budget.percentageUsed || 0),
 
-          income: categoryIncome,
-        };
-      });
+        status: budget.status || "on-track",
+
+        income: categoryIncome,
+
+        month: budget.month,
+
+        year: budget.year,
+      };
+    });
 
     // ========================================================
     // STATUS
@@ -3354,10 +2653,7 @@ exports.getBudgetSummary = async (req, res) => {
       status = "over-budget";
     } else if (overallPercentage >= 80) {
       status = "approaching-limit";
-    } else if (
-      overallPercentage < 50 &&
-      totalSpent > 0
-    ) {
+    } else if (overallPercentage < 50 && totalSpent > 0) {
       status = "under-budget";
     }
 
@@ -3370,34 +2666,34 @@ exports.getBudgetSummary = async (req, res) => {
 
       data: {
         month: currentMonth,
+
         year: currentYear,
 
         totalIncome,
+
+        availableIncome,
+
         totalBudgeted,
+
         totalSpent,
+
         totalRemaining,
 
-        overallPercentage:
-          Number(
-            overallPercentage.toFixed(2)
-          ),
+        overallPercentage: Number(overallPercentage.toFixed(2)),
 
         status,
 
-        categories:
-          categoryBreakdown,
+        categories: categoryBreakdown,
       },
     });
   } catch (error) {
-    console.error(
-      "❌ Get budget summary error:",
-      error
-    );
+    console.error("❌ Get budget summary error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch budget summary",
+
+      message: "Failed to fetch budget summary",
+
       error: error.message,
     });
   }
@@ -3406,6 +2702,10 @@ exports.getBudgetSummary = async (req, res) => {
 // ============================================================
 // GET INCOME STATISTICS
 // @route GET /api/incomes/stats
+//
+// Supports:
+// ?userId=...
+// ?email=...
 // ============================================================
 
 exports.getIncomeStats = async (req, res) => {
@@ -3416,158 +2716,170 @@ exports.getIncomeStats = async (req, res) => {
     // OWNERSHIP
     // ========================================================
 
-    if (
-      !userId &&
-      !email &&
-      (!req.user || !req.user.email)
-    ) {
+    if (!userId && !email && (!req.user || !req.user.email)) {
       return res.status(400).json({
         success: false,
+
         message: "userId or email is required",
       });
     }
 
     const query = {};
 
+    // --------------------------------------------------------
+    // USER ID
+    // --------------------------------------------------------
+
     if (userId) {
-      if (
-        !mongoose.Types.ObjectId.isValid(
-          userId
-        )
-      ) {
+      if (!isValidObjectId(userId)) {
         return res.status(400).json({
           success: false,
+
           message: "Invalid userId",
         });
       }
 
       query.userId = userId;
-    } else {
-      const userEmail = String(
-        email || req.user.email
-      )
-        .trim()
-        .toLowerCase();
+    }
 
-      query.email = userEmail;
+    // --------------------------------------------------------
+    // EMAIL
+    // --------------------------------------------------------
+    else {
+      query.email = normalizeEmail(email || req.user.email);
     }
 
     // ========================================================
     // TOTAL INCOME
     // ========================================================
 
-    const totalIncome =
-      await Income.aggregate([
-        {
-          $match: query,
-        },
-        {
-          $group: {
-            _id: null,
+    const totalIncome = await Income.aggregate([
+      {
+        $match: query,
+      },
 
-            total: {
-              $sum: "$amount",
-            },
+      {
+        $group: {
+          _id: null,
 
-            count: {
-              $sum: 1,
-            },
+          total: {
+            $sum: "$amount",
+          },
+
+          remaining: {
+            $sum: "$remainingAmount",
+          },
+
+          count: {
+            $sum: 1,
           },
         },
-      ]);
+      },
+    ]);
 
     // ========================================================
     // INCOME BY CATEGORY
     // ========================================================
 
-    const categoryStats =
-      await Income.aggregate([
-        {
-          $match: query,
-        },
-        {
-          $group: {
-            _id: "$category",
+    const categoryStats = await Income.aggregate([
+      {
+        $match: query,
+      },
 
-            total: {
-              $sum: "$amount",
-            },
+      {
+        $group: {
+          _id: "$category",
 
-            count: {
-              $sum: 1,
-            },
+          total: {
+            $sum: "$amount",
+          },
+
+          remaining: {
+            $sum: "$remainingAmount",
+          },
+
+          count: {
+            $sum: 1,
           },
         },
-        {
-          $sort: {
-            total: -1,
-          },
+      },
+
+      {
+        $sort: {
+          total: -1,
         },
-      ]);
+      },
+    ]);
 
     // ========================================================
     // LAST 12 MONTHS
     // ========================================================
 
-    const twelveMonthsAgo =
-      new Date();
+    const twelveMonthsAgo = new Date();
 
-    twelveMonthsAgo.setMonth(
-      twelveMonthsAgo.getMonth() - 12
-    );
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
-    const monthlyStats =
-      await Income.aggregate([
-        {
-          $match: {
-            ...query,
+    const monthlyStats = await Income.aggregate([
+      {
+        $match: {
+          ...query,
 
-            date: {
-              $gte: twelveMonthsAgo,
-            },
+          date: {
+            $gte: twelveMonthsAgo,
           },
         },
-        {
-          $group: {
-            _id: {
-              year: {
-                $year: "$date",
-              },
+      },
 
-              month: {
-                $month: "$date",
-              },
+      {
+        $group: {
+          _id: {
+            year: {
+              $year: "$date",
             },
 
-            total: {
-              $sum: "$amount",
-            },
-
-            count: {
-              $sum: 1,
+            month: {
+              $month: "$date",
             },
           },
-        },
-        {
-          $sort: {
-            "_id.year": -1,
-            "_id.month": -1,
+
+          total: {
+            $sum: "$amount",
+          },
+
+          remaining: {
+            $sum: "$remainingAmount",
+          },
+
+          count: {
+            $sum: 1,
           },
         },
-      ]);
+      },
+
+      {
+        $sort: {
+          "_id.year": -1,
+
+          "_id.month": -1,
+        },
+      },
+    ]);
+
+    // ========================================================
+    // CURRENT MONTH
+    // ========================================================
+
+    const currentMonth = new Date().getMonth();
+
+    const currentYear = new Date().getFullYear();
 
     // ========================================================
     // CURRENT MONTH BUDGET
     // ========================================================
 
-    const currentMonth =
-      new Date().getMonth();
-
-    const currentYear =
-      new Date().getFullYear();
-
     const budgetQuery = {
       month: currentMonth,
+
       year: currentYear,
     };
 
@@ -3577,46 +2889,74 @@ exports.getIncomeStats = async (req, res) => {
       budgetQuery.email = query.email;
     }
 
-    const budgets =
-      await Budget.find(
-        budgetQuery
-      );
+    const budgets = await Budget.find(budgetQuery);
 
-    const totalBudgeted =
-      budgets.reduce(
-        (sum, budget) =>
-          sum +
-          Number(
-            budget.allocatedAmount || 0
-          ),
-        0
-      );
+    // ========================================================
+    // BUDGET TOTALS
+    // ========================================================
 
-    const totalSpent =
-      budgets.reduce(
-        (sum, budget) =>
-          sum +
-          Number(
-            budget.spentAmount || 0
-          ),
-        0
-      );
+    const totalBudgeted = budgets.reduce(
+      (sum, budget) => sum + Number(budget.allocatedAmount || 0),
+      0,
+    );
 
-    const remainingBudget =
-      budgets.reduce(
-        (sum, budget) =>
-          sum +
-          Number(
-            budget.remainingAmount || 0
-          ),
-        0
-      );
+    const totalSpent = budgets.reduce(
+      (sum, budget) => sum + Number(budget.spentAmount || 0),
+      0,
+    );
+
+    const remainingBudget = budgets.reduce(
+      (sum, budget) => sum + Number(budget.remainingAmount || 0),
+      0,
+    );
 
     const percentageUsed =
-      totalBudgeted > 0
-        ? (totalSpent /
-            totalBudgeted) *
-          100
+      totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
+
+    // ========================================================
+    // CURRENT MONTH INCOME
+    // ========================================================
+
+    const currentMonthStart = new Date(currentYear, currentMonth, 1);
+
+    const nextMonthStart = new Date(currentYear, currentMonth + 1, 1);
+
+    const currentMonthIncome = await Income.aggregate([
+      {
+        $match: {
+          ...query,
+
+          date: {
+            $gte: currentMonthStart,
+
+            $lt: nextMonthStart,
+          },
+        },
+      },
+
+      {
+        $group: {
+          _id: null,
+
+          total: {
+            $sum: "$amount",
+          },
+
+          remaining: {
+            $sum: "$remainingAmount",
+          },
+        },
+      },
+    ]);
+
+    const monthlyIncomeTotal =
+      currentMonthIncome.length > 0
+        ? Number(currentMonthIncome[0].total || 0)
+        : 0;
+
+    const monthlyIncomeRemaining =
+      currentMonthIncome.length > 0
+        ? Number(currentMonthIncome[0].remaining || 0)
         : 0;
 
     // ========================================================
@@ -3628,48 +2968,51 @@ exports.getIncomeStats = async (req, res) => {
 
       data: {
         totalIncome:
-          totalIncome.length > 0
-            ? totalIncome[0].total
-            : 0,
+          totalIncome.length > 0 ? Number(totalIncome[0].total || 0) : 0,
 
-        totalCount:
-          totalIncome.length > 0
-            ? totalIncome[0].count
-            : 0,
+        totalRemainingIncome:
+          totalIncome.length > 0 ? Number(totalIncome[0].remaining || 0) : 0,
 
-        categoryBreakdown:
-          categoryStats,
+        totalCount: totalIncome.length > 0 ? totalIncome[0].count : 0,
 
-        monthlyBreakdown:
-          monthlyStats,
+        categoryBreakdown: categoryStats,
+
+        monthlyBreakdown: monthlyStats,
+
+        currentMonthIncome: {
+          month: currentMonth,
+
+          year: currentYear,
+
+          total: monthlyIncomeTotal,
+
+          remaining: monthlyIncomeRemaining,
+        },
 
         currentMonthBudget: {
           month: currentMonth,
+
           year: currentYear,
 
           totalBudgeted,
+
           totalSpent,
+
           remainingBudget,
 
-          percentageUsed:
-            Number(
-              percentageUsed.toFixed(2)
-            ),
+          percentageUsed: Number(percentageUsed.toFixed(2)),
         },
       },
     });
   } catch (error) {
-    console.error(
-      "❌ Get income stats error:",
-      error
-    );
+    console.error("❌ Get income stats error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch income statistics",
+
+      message: "Failed to fetch income statistics",
+
       error: error.message,
     });
   }
 };
-
