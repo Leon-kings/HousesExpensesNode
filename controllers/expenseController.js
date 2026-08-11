@@ -3643,6 +3643,33 @@ const findBudgetForExpense = async ({
 // APPLY EXPENSE TO BUDGET
 // ============================================================
 
+// const applyBudgetAmount = async ({
+//   budget,
+//   amount,
+//   session,
+// }) => {
+//   if (!budget) {
+//     return 0;
+//   }
+
+//   const numericAmount =
+//     Number(amount) || 0;
+
+//   if (numericAmount <= 0) {
+//     return 0;
+//   }
+
+//   budget.spentAmount =
+//     (Number(budget.spentAmount) || 0) +
+//     numericAmount;
+
+//   await budget.save({
+//     session,
+//   });
+
+//   return numericAmount;
+// };
+
 const applyBudgetAmount = async ({
   budget,
   amount,
@@ -3652,20 +3679,50 @@ const applyBudgetAmount = async ({
     return 0;
   }
 
-  const numericAmount =
-    Number(amount) || 0;
+  const numericAmount = Number(amount) || 0;
 
   if (numericAmount <= 0) {
     return 0;
   }
 
+  // Update spent amount
   budget.spentAmount =
     (Number(budget.spentAmount) || 0) +
     numericAmount;
 
-  await budget.save({
-    session,
-  });
+  // Update remaining amount
+  budget.remainingAmount =
+    Math.max(
+      0,
+      (Number(budget.allocatedAmount) || 0) -
+      budget.spentAmount
+    );
+
+  // Update percentage
+  budget.percentageUsed =
+    budget.allocatedAmount > 0
+      ? Math.round(
+          (budget.spentAmount /
+            budget.allocatedAmount) *
+            100
+        )
+      : 0;
+
+  // Update status
+  if (
+    budget.spentAmount >
+    budget.allocatedAmount
+  ) {
+    budget.status = "over-budget";
+  } else if (
+    budget.percentageUsed >= 80
+  ) {
+    budget.status = "approaching-limit";
+  } else {
+    budget.status = "on-track";
+  }
+
+  await budget.save({ session });
 
   return numericAmount;
 };

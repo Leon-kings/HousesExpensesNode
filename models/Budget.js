@@ -1,4 +1,3 @@
-
 // ============================================================
 // MODELS / BUDGET.JS
 // ============================================================
@@ -17,16 +16,10 @@ const budgetSchema = new mongoose.Schema(
 
     category: {
       type: String,
-      required: [
-        true,
-        "Category is required",
-      ],
+      required: [true, "Category is required"],
       trim: true,
       lowercase: true,
-      maxlength: [
-        100,
-        "Category cannot exceed 100 characters",
-      ],
+      maxlength: [100, "Category cannot exceed 100 characters"],
     },
 
     // ========================================================
@@ -35,21 +28,12 @@ const budgetSchema = new mongoose.Schema(
 
     allocatedAmount: {
       type: Number,
-      required: [
-        true,
-        "Allocated amount is required",
-      ],
-      min: [
-        0,
-        "Allocated amount cannot be negative",
-      ],
+      required: [true, "Allocated amount is required"],
+      min: [0, "Allocated amount cannot be negative"],
       validate: {
         validator: (value) =>
-          Number.isFinite(value) &&
-          Number.isInteger(value) &&
-          value >= 0,
-        message:
-          "Allocated amount must be a valid whole number",
+          Number.isFinite(value) && Number.isInteger(value) && value >= 0,
+        message: "Allocated amount must be a valid whole number",
       },
     },
 
@@ -60,17 +44,11 @@ const budgetSchema = new mongoose.Schema(
     spentAmount: {
       type: Number,
       default: 0,
-      min: [
-        0,
-        "Spent amount cannot be negative",
-      ],
+      min: [0, "Spent amount cannot be negative"],
       validate: {
         validator: (value) =>
-          Number.isFinite(value) &&
-          Number.isInteger(value) &&
-          value >= 0,
-        message:
-          "Spent amount must be a valid whole number",
+          Number.isFinite(value) && Number.isInteger(value) && value >= 0,
+        message: "Spent amount must be a valid whole number",
       },
     },
 
@@ -87,10 +65,7 @@ const budgetSchema = new mongoose.Schema(
     remainingAmount: {
       type: Number,
       default: 0,
-      min: [
-        0,
-        "Remaining amount cannot be negative",
-      ],
+      min: [0, "Remaining amount cannot be negative"],
     },
 
     // ========================================================
@@ -109,11 +84,7 @@ const budgetSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: [
-        "on-track",
-        "approaching-limit",
-        "over-budget",
-      ],
+      enum: ["on-track", "approaching-limit", "over-budget"],
       default: "on-track",
     },
 
@@ -126,23 +97,12 @@ const budgetSchema = new mongoose.Schema(
 
     month: {
       type: Number,
-      required: [
-        true,
-        "Month is required",
-      ],
-      min: [
-        0,
-        "Month must be between 0 and 11",
-      ],
-      max: [
-        11,
-        "Month must be between 0 and 11",
-      ],
+      required: [true, "Month is required"],
+      min: [0, "Month must be between 0 and 11"],
+      max: [11, "Month must be between 0 and 11"],
       validate: {
-        validator: (value) =>
-          Number.isInteger(value),
-        message:
-          "Month must be an integer between 0 and 11",
+        validator: (value) => Number.isInteger(value),
+        message: "Month must be an integer between 0 and 11",
       },
     },
 
@@ -152,19 +112,11 @@ const budgetSchema = new mongoose.Schema(
 
     year: {
       type: Number,
-      required: [
-        true,
-        "Year is required",
-      ],
-      min: [
-        2000,
-        "Year must be 2000 or later",
-      ],
+      required: [true, "Year is required"],
+      min: [2000, "Year must be 2000 or later"],
       validate: {
-        validator: (value) =>
-          Number.isInteger(value),
-        message:
-          "Year must be a valid integer",
+        validator: (value) => Number.isInteger(value),
+        message: "Year must be a valid integer",
       },
     },
 
@@ -175,10 +127,7 @@ const budgetSchema = new mongoose.Schema(
     description: {
       type: String,
       trim: true,
-      maxlength: [
-        500,
-        "Description cannot exceed 500 characters",
-      ],
+      maxlength: [500, "Description cannot exceed 500 characters"],
       default: "",
     },
 
@@ -188,10 +137,7 @@ const budgetSchema = new mongoose.Schema(
 
     email: {
       type: String,
-      required: [
-        true,
-        "Email is required",
-      ],
+      required: [true, "Email is required"],
       trim: true,
       lowercase: true,
       index: true,
@@ -204,77 +150,52 @@ const budgetSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [
-        true,
-        "User ID is required",
-      ],
+      required: [true, "User ID is required"],
       index: true,
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // ============================================================
 // CALCULATE BUDGET VALUES
 // ============================================================
 
-budgetSchema.methods.calculateValues =
-  function () {
-    const allocated =
-      Number(this.allocatedAmount) || 0;
+budgetSchema.methods.calculateValues = function () {
+  const allocated = Number(this.allocatedAmount) || 0;
 
-    const spent =
-      Number(this.spentAmount) || 0;
+  const spent = Number(this.spentAmount) || 0;
 
-    // --------------------------------------------------------
-    // REMAINING
-    // --------------------------------------------------------
+  // --------------------------------------------------------
+  // REMAINING
+  // --------------------------------------------------------
 
-    this.remainingAmount =
-      Math.max(
-        allocated - spent,
-        0
-      );
+  this.remainingAmount = Math.max(allocated - spent, 0);
 
-    // --------------------------------------------------------
-    // PERCENTAGE
-    // --------------------------------------------------------
+  // --------------------------------------------------------
+  // PERCENTAGE
+  // --------------------------------------------------------
 
-    if (allocated > 0) {
-      this.percentageUsed =
-        Number(
-          (
-            (spent / allocated) *
-            100
-          ).toFixed(2)
-        );
-    } else {
-      this.percentageUsed = 0;
-    }
+  if (allocated > 0) {
+    this.percentageUsed = Number(((spent / allocated) * 100).toFixed(2));
+  } else {
+    this.percentageUsed = 0;
+  }
 
-    // --------------------------------------------------------
-    // STATUS
-    // --------------------------------------------------------
+  // --------------------------------------------------------
+  // STATUS
+  // --------------------------------------------------------
 
-    if (
-      allocated > 0 &&
-      spent > allocated
-    ) {
-      this.status =
-        "over-budget";
-    } else if (
-      allocated > 0 &&
-      this.percentageUsed >= 80
-    ) {
-      this.status =
-        "approaching-limit";
-    } else {
-      this.status =
-        "on-track";
-    }
-  };
+  if (allocated > 0 && spent > allocated) {
+    this.status = "over-budget";
+  } else if (allocated > 0 && this.percentageUsed >= 80) {
+    this.status = "approaching-limit";
+  } else {
+    this.status = "on-track";
+  }
+};
 
 // ============================================================
 // PRE-SAVE
@@ -285,9 +206,7 @@ budgetSchema.pre("save", function () {
   // CATEGORY
   // ----------------------------------------------------------
 
-  this.category = String(
-    this.category || ""
-  )
+  this.category = String(this.category || "")
     .trim()
     .toLowerCase();
 
@@ -295,9 +214,7 @@ budgetSchema.pre("save", function () {
   // EMAIL
   // ----------------------------------------------------------
 
-  this.email = String(
-    this.email || ""
-  )
+  this.email = String(this.email || "")
     .trim()
     .toLowerCase();
 
@@ -305,49 +222,35 @@ budgetSchema.pre("save", function () {
   // DESCRIPTION
   // ----------------------------------------------------------
 
-  this.description = String(
-    this.description || ""
-  ).trim();
+  this.description = String(this.description || "").trim();
 
   // ----------------------------------------------------------
   // ALLOCATED
   // ----------------------------------------------------------
 
-  const allocated =
-    Number(this.allocatedAmount);
+  const allocated = Number(this.allocatedAmount);
 
   if (
     !Number.isFinite(allocated) ||
     !Number.isInteger(allocated) ||
     allocated < 0
   ) {
-    throw new Error(
-      "Allocated amount must be a valid whole number"
-    );
+    throw new Error("Allocated amount must be a valid whole number");
   }
 
-  this.allocatedAmount =
-    allocated;
+  this.allocatedAmount = allocated;
 
   // ----------------------------------------------------------
   // SPENT
   // ----------------------------------------------------------
 
-  const spent =
-    Number(this.spentAmount) || 0;
+  const spent = Number(this.spentAmount) || 0;
 
-  if (
-    !Number.isFinite(spent) ||
-    !Number.isInteger(spent) ||
-    spent < 0
-  ) {
-    throw new Error(
-      "Spent amount must be a valid whole number"
-    );
+  if (!Number.isFinite(spent) || !Number.isInteger(spent) || spent < 0) {
+    throw new Error("Spent amount must be a valid whole number");
   }
 
-  this.spentAmount =
-    spent;
+  this.spentAmount = spent;
 
   // ----------------------------------------------------------
   // CALCULATE
@@ -360,28 +263,23 @@ budgetSchema.pre("save", function () {
 // ADD SPENDING TO BUDGET
 // ============================================================
 
-budgetSchema.methods.addExpense =
-  function (amount) {
-    const numericAmount =
-      Number(amount);
+budgetSchema.methods.addExpense = function (amount) {
+  const numericAmount = Number(amount);
 
-    if (
-      !Number.isFinite(numericAmount) ||
-      !Number.isInteger(numericAmount) ||
-      numericAmount <= 0
-    ) {
-      throw new Error(
-        "Budget expense amount must be a positive whole number"
-      );
-    }
+  if (
+    !Number.isFinite(numericAmount) ||
+    !Number.isInteger(numericAmount) ||
+    numericAmount <= 0
+  ) {
+    throw new Error("Budget expense amount must be a positive whole number");
+  }
 
-    this.spentAmount +=
-      numericAmount;
+  this.spentAmount += numericAmount;
 
-    this.calculateValues();
+  this.calculateValues();
 
-    return this;
-  };
+  return this;
+};
 
 // ============================================================
 // REMOVE SPENDING FROM BUDGET
@@ -389,32 +287,23 @@ budgetSchema.methods.addExpense =
 // Useful when deleting an expense.
 // ============================================================
 
-budgetSchema.methods.removeExpense =
-  function (amount) {
-    const numericAmount =
-      Number(amount);
+budgetSchema.methods.removeExpense = function (amount) {
+  const numericAmount = Number(amount);
 
-    if (
-      !Number.isFinite(numericAmount) ||
-      !Number.isInteger(numericAmount) ||
-      numericAmount <= 0
-    ) {
-      throw new Error(
-        "Budget restore amount must be a positive whole number"
-      );
-    }
+  if (
+    !Number.isFinite(numericAmount) ||
+    !Number.isInteger(numericAmount) ||
+    numericAmount <= 0
+  ) {
+    throw new Error("Budget restore amount must be a positive whole number");
+  }
 
-    this.spentAmount =
-      Math.max(
-        0,
-        this.spentAmount -
-          numericAmount
-      );
+  this.spentAmount = Math.max(0, this.spentAmount - numericAmount);
 
-    this.calculateValues();
+  this.calculateValues();
 
-    return this;
-  };
+  return this;
+};
 
 // ============================================================
 // UNIQUE BUDGET
@@ -432,7 +321,7 @@ budgetSchema.index(
   },
   {
     unique: true,
-  }
+  },
 );
 
 // ============================================================
@@ -466,8 +355,4 @@ budgetSchema.index({
 // ============================================================
 
 module.exports =
-  mongoose.models.Budget ||
-  mongoose.model(
-    "Budget",
-    budgetSchema
-  );
+  mongoose.models.Budget || mongoose.model("Budget", budgetSchema);
