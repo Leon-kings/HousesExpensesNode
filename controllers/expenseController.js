@@ -2630,31 +2630,7 @@ const normalizeEmail = (email) => {
 // STRICT MONEY VALIDATION
 // ============================================================
 
-const parsePositiveWholeNumber = (value) => {
-  if (
-    value === null ||
-    value === undefined ||
-    value === ""
-  ) {
-    return null;
-  }
 
-  const stringValue = String(value).trim();
-
-  // NO decimals
-  if (!/^\d+$/.test(stringValue)) {
-    return null;
-  }
-
-  const number = Number(stringValue);
-
-  // NO zero
-  if (!Number.isSafeInteger(number) || number <= 0) {
-    return null;
-  }
-
-  return number;
-};
 
 const parseNonNegativeWholeNumber = (value) => {
   if (
