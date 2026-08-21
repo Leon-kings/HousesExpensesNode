@@ -4131,6 +4131,195 @@ const reverseBudgetAmount = async ({
 };
 
 // ============================================================
+// ALLOCATE INCOME ONLY
+//
+// EXPENSES CAN ONLY USE INCOME.
+//
+// Budget does NOT fund expenses.
+// Savings does NOT fund expenses.
+// ============================================================
+
+// ============================================================
+
+
+const allocateIncomeOnly = async ({
+  amount,
+  userId,
+  email,
+  session,
+}) => {
+  const numericAmount = Number(amount);
+
+  if (
+    !Number.isFinite(numericAmount) ||
+    !Number.isInteger(numericAmount) ||
+    numericAmount <= 0
+  ) {
+    throw new Error(
+      "Expense amount must be a positive whole number"
+    );
+  }
+
+  // ==========================================================
+  // FIND AVAILABLE INCOME
+  // ==========================================================
+
+  const incomes = await Income.find({
+    userId,
+    email,
+    remainingAmount: {
+      $gt: 0,
+    },
+  })
+    .sort({
+      date: 1,
+      createdAt: 1,
+    })
+    .session(session);
+
+  // ==========================================================
+  // CALCULATE TOTAL AVAILABLE INCOME
+  // ==========================================================
+
+  const totalAvailable = incomes.reduce(
+    (total, income) => {
+      return (
+        total +
+        Number(
+          income.remainingAmount || 0
+        )
+      );
+    },
+    0
+  );
+
+  // ==========================================================
+  // INCOME NOT ENOUGH
+  // ==========================================================
+
+  if (
+    totalAvailable <
+    numericAmount
+  ) {
+    const shortage =
+      numericAmount -
+      totalAvailable;
+
+    const error = new Error(
+      `Insufficient income. RWF ${shortage.toLocaleString()} is still required.`
+    );
+
+    error.statusCode = 400;
+
+    throw error;
+  }
+
+  // ==========================================================
+  // ALLOCATE FROM INCOME
+  //
+  // Oldest income first.
+  // ==========================================================
+
+  let remainingToAllocate =
+    numericAmount;
+
+  let incomeUsed = 0;
+
+  const incomeAllocations = [];
+
+  for (const income of incomes) {
+    if (
+      remainingToAllocate <= 0
+    ) {
+      break;
+    }
+
+    const available =
+      Number(
+        income.remainingAmount || 0
+      );
+
+    if (available <= 0) {
+      continue;
+    }
+
+    const amountFromIncome =
+      Math.min(
+        available,
+        remainingToAllocate
+      );
+
+    // ========================================================
+    // REDUCE INCOME
+    // ========================================================
+
+    income.useAmount(
+      amountFromIncome
+    );
+
+    await income.save({
+      session,
+    });
+
+    // ========================================================
+    // RECORD ALLOCATION
+    // ========================================================
+
+    incomeAllocations.push({
+      incomeId: income._id,
+      amount: amountFromIncome,
+    });
+
+    incomeUsed +=
+      amountFromIncome;
+
+    remainingToAllocate -=
+      amountFromIncome;
+  }
+
+  // ==========================================================
+  // FINAL CHECK
+  // ==========================================================
+
+  if (
+    remainingToAllocate > 0
+  ) {
+    throw new Error(
+      `Insufficient income. RWF ${remainingToAllocate.toLocaleString()} is still required.`
+    );
+  }
+
+  // ==========================================================
+  // SAFETY CHECK
+  // ==========================================================
+
+  if (
+    incomeUsed !==
+    numericAmount
+  ) {
+    throw new Error(
+      `Income allocation mismatch: incomeUsed (${incomeUsed}) must equal expense amount (${numericAmount})`
+    );
+  }
+
+  // ==========================================================
+  // RETURN
+  //
+  // SAVINGS ARE ALWAYS ZERO.
+  // ==========================================================
+
+  return {
+    incomeUsed,
+
+    incomeAllocations,
+
+    savingsUsed: 0,
+
+    savingsAllocations: [],
+  };
+};
+
+// ============================================================
 // CREATE EXPENSE
 // ============================================================
 
