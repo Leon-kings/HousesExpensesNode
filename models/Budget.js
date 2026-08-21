@@ -392,60 +392,33 @@ const budgetSchema = new mongoose.Schema(
       validate: {
         validator: (value) =>
           Number.isFinite(value) && Number.isInteger(value) && value >= 0,
-
         message: "Allocated amount must be a valid whole number",
       },
     },
 
     // ========================================================
     // SPENT AMOUNT
-    //
-    // Can be greater than allocatedAmount.
-    //
-    // Example:
-    //
-    // allocated = 100000
-    // spent     = 120000
-    //
-    // This means the budget was exceeded.
     // ========================================================
 
     spentAmount: {
       type: Number,
       default: 0,
-
       min: [0, "Spent amount cannot be negative"],
-
       validate: {
         validator: (value) =>
           Number.isFinite(value) && Number.isInteger(value) && value >= 0,
-
         message: "Spent amount must be a valid whole number",
       },
     },
 
     // ========================================================
     // REMAINING AMOUNT
-    //
-    // calculated:
-    //
-    // allocatedAmount - spentAmount
-    //
-    // IMPORTANT:
-    // This is allowed to become negative.
-    //
-    // Example:
-    //
-    // allocated = 100000
-    // spent     = 120000
-    // remaining = -20000
-    //
-    // This clearly shows the budget was exceeded.
     // ========================================================
 
     remainingAmount: {
       type: Number,
       default: 0,
+      min: [0, "Remaining amount cannot be negative"],
     },
 
     // ========================================================
@@ -455,8 +428,7 @@ const budgetSchema = new mongoose.Schema(
     percentageUsed: {
       type: Number,
       default: 0,
-
-      min: [0, "Percentage used cannot be negative"],
+      min: 0,
     },
 
     // ========================================================
@@ -465,31 +437,21 @@ const budgetSchema = new mongoose.Schema(
 
     status: {
       type: String,
-
-      enum: ["on-track", "approaching-limit", "over-budget"],
-
+      enum: ["on-track", "approaching-limit", "over-budget", "under-budget"],
       default: "on-track",
     },
 
     // ========================================================
     // MONTH
-    //
-    // 0 = January
-    // 11 = December
     // ========================================================
 
     month: {
       type: Number,
-
       required: [true, "Month is required"],
-
       min: [0, "Month must be between 0 and 11"],
-
       max: [11, "Month must be between 0 and 11"],
-
       validate: {
         validator: (value) => Number.isInteger(value),
-
         message: "Month must be an integer between 0 and 11",
       },
     },
@@ -500,14 +462,10 @@ const budgetSchema = new mongoose.Schema(
 
     year: {
       type: Number,
-
       required: [true, "Year is required"],
-
       min: [2000, "Year must be 2000 or later"],
-
       validate: {
         validator: (value) => Number.isInteger(value),
-
         message: "Year must be a valid integer",
       },
     },
@@ -518,11 +476,8 @@ const budgetSchema = new mongoose.Schema(
 
     description: {
       type: String,
-
       trim: true,
-
       maxlength: [500, "Description cannot exceed 500 characters"],
-
       default: "",
     },
 
@@ -532,13 +487,9 @@ const budgetSchema = new mongoose.Schema(
 
     email: {
       type: String,
-
       required: [true, "Email is required"],
-
       trim: true,
-
       lowercase: true,
-
       index: true,
     },
 
@@ -548,15 +499,11 @@ const budgetSchema = new mongoose.Schema(
 
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-
       ref: "User",
-
       required: [true, "User ID is required"],
-
       index: true,
     },
   },
-
   {
     timestamps: true,
   },
@@ -568,22 +515,17 @@ const budgetSchema = new mongoose.Schema(
 
 budgetSchema.methods.calculateValues = function () {
   const allocated = Number(this.allocatedAmount) || 0;
-
   const spent = Number(this.spentAmount) || 0;
 
-  // --------------------------------------------------------
+  // ----------------------------------------------------------
   // REMAINING
-  //
-  // DO NOT USE Math.max()
-  //
-  // We want negative remaining values when over budget.
-  // --------------------------------------------------------
+  // ----------------------------------------------------------
 
-  this.remainingAmount = allocated - spent;
+  this.remainingAmount = Math.max(allocated - spent, 0);
 
-  // --------------------------------------------------------
+  // ----------------------------------------------------------
   // PERCENTAGE
-  // --------------------------------------------------------
+  // ----------------------------------------------------------
 
   if (allocated > 0) {
     this.percentageUsed = Number(((spent / allocated) * 100).toFixed(2));
@@ -591,19 +533,19 @@ budgetSchema.methods.calculateValues = function () {
     this.percentageUsed = 0;
   }
 
-  // --------------------------------------------------------
+  // ----------------------------------------------------------
   // STATUS
-  // --------------------------------------------------------
+  // ----------------------------------------------------------
 
-  if (allocated > 0 && spent > allocated) {
+  if (spent > allocated) {
     this.status = "over-budget";
-  } else if (allocated > 0 && this.percentageUsed >= 80) {
+  } else if (allocated === 0) {
+    this.status = "under-budget";
+  } else if (this.percentageUsed >= 80) {
     this.status = "approaching-limit";
   } else {
     this.status = "on-track";
   }
-
-  return this;
 };
 
 // ============================================================
@@ -611,31 +553,15 @@ budgetSchema.methods.calculateValues = function () {
 // ============================================================
 
 budgetSchema.pre("save", function () {
-  // --------------------------------------------------------
-  // CATEGORY
-  // --------------------------------------------------------
-
   this.category = String(this.category || "")
     .trim()
     .toLowerCase();
-
-  // --------------------------------------------------------
-  // EMAIL
-  // --------------------------------------------------------
 
   this.email = String(this.email || "")
     .trim()
     .toLowerCase();
 
-  // --------------------------------------------------------
-  // DESCRIPTION
-  // --------------------------------------------------------
-
   this.description = String(this.description || "").trim();
-
-  // --------------------------------------------------------
-  // ALLOCATED
-  // --------------------------------------------------------
 
   const allocated = Number(this.allocatedAmount);
 
@@ -649,10 +575,6 @@ budgetSchema.pre("save", function () {
 
   this.allocatedAmount = allocated;
 
-  // --------------------------------------------------------
-  // SPENT
-  // --------------------------------------------------------
-
   const spent = Number(this.spentAmount) || 0;
 
   if (!Number.isFinite(spent) || !Number.isInteger(spent) || spent < 0) {
@@ -661,15 +583,11 @@ budgetSchema.pre("save", function () {
 
   this.spentAmount = spent;
 
-  // --------------------------------------------------------
-  // CALCULATE EVERYTHING
-  // --------------------------------------------------------
-
   this.calculateValues();
 });
 
 // ============================================================
-// ADD SPENDING TO BUDGET
+// ADD EXPENSE TO BUDGET
 // ============================================================
 
 budgetSchema.methods.addExpense = function (amount) {
@@ -683,7 +601,7 @@ budgetSchema.methods.addExpense = function (amount) {
     throw new Error("Budget expense amount must be a positive whole number");
   }
 
-  this.spentAmount = Number(this.spentAmount || 0) + numericAmount;
+  this.spentAmount += numericAmount;
 
   this.calculateValues();
 
@@ -691,9 +609,7 @@ budgetSchema.methods.addExpense = function (amount) {
 };
 
 // ============================================================
-// REMOVE SPENDING FROM BUDGET
-//
-// Useful when deleting an expense.
+// REMOVE EXPENSE FROM BUDGET
 // ============================================================
 
 budgetSchema.methods.removeExpense = function (amount) {
@@ -707,7 +623,7 @@ budgetSchema.methods.removeExpense = function (amount) {
     throw new Error("Budget restore amount must be a positive whole number");
   }
 
-  this.spentAmount = Math.max(0, Number(this.spentAmount || 0) - numericAmount);
+  this.spentAmount = Math.max(0, this.spentAmount - numericAmount);
 
   this.calculateValues();
 
@@ -716,9 +632,6 @@ budgetSchema.methods.removeExpense = function (amount) {
 
 // ============================================================
 // UNIQUE BUDGET
-//
-// One budget per:
-// user + category + month + year
 // ============================================================
 
 budgetSchema.index(

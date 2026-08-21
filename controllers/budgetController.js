@@ -719,451 +719,723 @@
 //   }
 // };
 
-
-
-
-
-
-
-
-
-
-// ============================================================
-// CONTROLLERS / BUDGETCONTROLLER.JS
-// ============================================================
-
-const mongoose = require("mongoose");
-const Budget = require("../models/Budget");
-
-// ============================================================
-// NOTIFICATION HELPER
-// ============================================================
-
-const createNotification = require("../utils/createNotification");
-
-// ============================================================
-// HELPERS
-// ============================================================
-
-const normalizeEmail = (email) =>
-  String(email || "")
-    .trim()
-    .toLowerCase();
-
-const normalizeCategory = (category) =>
-  String(category || "")
-    .trim()
-    .toLowerCase();
-
-const normalizeDescription = (description) =>
-  String(description || "").trim();
-
-const isValidObjectId = (id) =>
-  mongoose.Types.ObjectId.isValid(id);
-
-const parseWholeNumber = (value) => {
-  const number = Number(value);
-
-  if (
-    !Number.isFinite(number) ||
-    !Number.isInteger(number)
-  ) {
-    return null;
-  }
-
-  return number;
-};
-
-const parseNonNegativeWholeNumber = (value) => {
-  const number = parseWholeNumber(value);
-
-  if (number === null || number < 0) {
-    return null;
-  }
-
-  return number;
-};
-
-const parseMonth = (value) => {
-  const month = Number(value);
-
-  if (
-    !Number.isInteger(month) ||
-    month < 0 ||
-    month > 11
-  ) {
-    return null;
-  }
-
-  return month;
-};
-
-const parseYear = (value) => {
-  const year = Number(value);
-
-  if (
-    !Number.isInteger(year) ||
-    year < 2000
-  ) {
-    return null;
-  }
-
-  return year;
-};
-
-// ============================================================
-// GET ALL BUDGETS
-//
-// Supports:
-//
-// ?userId=...
-// ?email=...
-// ?month=...
-// ?year=...
-// ?category=...
-//
-// If no filters are supplied, ALL budgets are returned.
-// ============================================================
-
-exports.getBudgets = async (req, res) => {
-  try {
-    const {
-      userId,
-      email,
-      month,
-      year,
-      category,
-    } = req.query;
-
-    const query = {};
-
-    // --------------------------------------------------------
-    // USER ID
-    // --------------------------------------------------------
-
-    if (userId !== undefined) {
-      if (!isValidObjectId(userId)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid userId",
-        });
-      }
-
-      query.userId = userId;
-    }
-
-    // --------------------------------------------------------
-    // EMAIL
-    // --------------------------------------------------------
-
-    if (email !== undefined) {
-      const normalizedEmail =
-        normalizeEmail(email);
-
-      if (!normalizedEmail) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid email",
-        });
-      }
-
-      query.email = normalizedEmail;
-    }
-
-    // --------------------------------------------------------
-    // MONTH
-    // --------------------------------------------------------
-
-    if (month !== undefined) {
-      const parsedMonth = parseMonth(month);
-
-      if (parsedMonth === null) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Month must be an integer between 0 and 11",
-        });
-      }
-
-      query.month = parsedMonth;
-    }
-
-    // --------------------------------------------------------
-    // YEAR
-    // --------------------------------------------------------
-
-    if (year !== undefined) {
-      const parsedYear = parseYear(year);
-
-      if (parsedYear === null) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid year",
-        });
-      }
-
-      query.year = parsedYear;
-    }
-
-    // --------------------------------------------------------
-    // CATEGORY
-    // --------------------------------------------------------
-
-    if (
-      category !== undefined &&
-      String(category).trim().toLowerCase() !== "all"
-    ) {
-      const normalizedCategory =
-        normalizeCategory(category);
-
-      if (!normalizedCategory) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid category",
-        });
-      }
-
-      query.category = normalizedCategory;
-    }
-
-    // --------------------------------------------------------
-    // FIND
-    // --------------------------------------------------------
-
-    const budgets = await Budget.find(query).sort({
-      year: -1,
-      month: -1,
-      category: 1,
-    });
-
-    // --------------------------------------------------------
-    // SUMMARY
-    // --------------------------------------------------------
-
-    const totalAllocated =
-      budgets.reduce(
-        (sum, budget) =>
-          sum +
-          Number(
-            budget.allocatedAmount || 0
-          ),
-        0
-      );
-
-    const totalSpent =
-      budgets.reduce(
-        (sum, budget) =>
-          sum +
-          Number(
-            budget.spentAmount || 0
-          ),
-        0
-      );
-
-    const totalRemaining =
-      budgets.reduce(
-        (sum, budget) =>
-          sum +
-          Number(
-            budget.remainingAmount || 0
-          ),
-        0
-      );
-
-    const percentage =
-      totalAllocated > 0
-        ? (totalSpent / totalAllocated) * 100
-        : 0;
-
-    return res.status(200).json({
-      success: true,
-
-      count: budgets.length,
-
-      data: budgets,
-
-      summary: {
-        totalAllocated,
-        totalSpent,
-        totalRemaining,
-
-        percentage: Number(
-          percentage.toFixed(2)
-        ),
-      },
-    });
-  } catch (error) {
-    console.error(
-      "❌ Get budgets error:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch budgets",
-      error: error.message,
-    });
-  }
-};
-
-// ============================================================
-// GET BUDGETS BY EMAIL
-// ============================================================
-
-exports.getBudgetsByEmail = async (
-  req,
-  res
-) => {
-  try {
-    const { email } = req.params;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
-
-    const normalizedEmail =
-      normalizeEmail(email);
-
-    if (!normalizedEmail) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email",
-      });
-    }
-
-    const budgets = await Budget.find({
-      email: normalizedEmail,
-    }).sort({
-      year: -1,
-      month: -1,
-      category: 1,
-    });
-
-    return res.status(200).json({
-      success: true,
-      count: budgets.length,
-      data: budgets,
-    });
-  } catch (error) {
-    console.error(
-      "❌ Get budgets by email error:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch budgets",
-      error: error.message,
-    });
-  }
-};
-
-// ============================================================
-// GET BUDGETS BY USER ID
-// ============================================================
-
-exports.getBudgetsByUserId = async (
-  req,
-  res
-) => {
-  try {
-    const { userId } = req.params;
-
-    if (
-      !userId ||
-      !isValidObjectId(userId)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid userId",
-      });
-    }
-
-    const budgets = await Budget.find({
-      userId,
-    }).sort({
-      year: -1,
-      month: -1,
-      category: 1,
-    });
-
-    return res.status(200).json({
-      success: true,
-      count: budgets.length,
-      data: budgets,
-    });
-  } catch (error) {
-    console.error(
-      "❌ Get budgets by userId error:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        "Failed to fetch budgets by userId",
-      error: error.message,
-    });
-  }
-};
-
-// ============================================================
-// GET SINGLE BUDGET
-// ============================================================
-
-exports.getBudget = async (
-  req,
-  res
-) => {
-  try {
-    const { id } = req.params;
-
-    if (!isValidObjectId(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid budget ID",
-      });
-    }
-
-    const budget =
-      await Budget.findById(id);
-
-    if (!budget) {
-      return res.status(404).json({
-        success: false,
-        message: "Budget not found",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: budget,
-    });
-  } catch (error) {
-    console.error(
-      "❌ Get budget error:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch budget",
-      error: error.message,
-    });
-  }
-};
-
-// ============================================================
-// CREATE BUDGET
-// ============================================================
-
-// exports.createBudget = async (
+// // ============================================================
+// // CONTROLLERS / BUDGETCONTROLLER.JS
+// // ============================================================
+
+// const mongoose = require("mongoose");
+// const Budget = require("../models/Budget");
+
+// // ============================================================
+// // NOTIFICATION HELPER
+// // ============================================================
+
+// const createNotification = require("../utils/createNotification");
+
+// // ============================================================
+// // HELPERS
+// // ============================================================
+
+// const normalizeEmail = (email) =>
+//   String(email || "")
+//     .trim()
+//     .toLowerCase();
+
+// const normalizeCategory = (category) =>
+//   String(category || "")
+//     .trim()
+//     .toLowerCase();
+
+// const normalizeDescription = (description) =>
+//   String(description || "").trim();
+
+// const isValidObjectId = (id) =>
+//   mongoose.Types.ObjectId.isValid(id);
+
+// const parseWholeNumber = (value) => {
+//   const number = Number(value);
+
+//   if (
+//     !Number.isFinite(number) ||
+//     !Number.isInteger(number)
+//   ) {
+//     return null;
+//   }
+
+//   return number;
+// };
+
+// const parseNonNegativeWholeNumber = (value) => {
+//   const number = parseWholeNumber(value);
+
+//   if (number === null || number < 0) {
+//     return null;
+//   }
+
+//   return number;
+// };
+
+// const parseMonth = (value) => {
+//   const month = Number(value);
+
+//   if (
+//     !Number.isInteger(month) ||
+//     month < 0 ||
+//     month > 11
+//   ) {
+//     return null;
+//   }
+
+//   return month;
+// };
+
+// const parseYear = (value) => {
+//   const year = Number(value);
+
+//   if (
+//     !Number.isInteger(year) ||
+//     year < 2000
+//   ) {
+//     return null;
+//   }
+
+//   return year;
+// };
+
+// // ============================================================
+// // GET ALL BUDGETS
+// //
+// // Supports:
+// //
+// // ?userId=...
+// // ?email=...
+// // ?month=...
+// // ?year=...
+// // ?category=...
+// //
+// // If no filters are supplied, ALL budgets are returned.
+// // ============================================================
+
+// exports.getBudgets = async (req, res) => {
+//   try {
+//     const {
+//       userId,
+//       email,
+//       month,
+//       year,
+//       category,
+//     } = req.query;
+
+//     const query = {};
+
+//     // --------------------------------------------------------
+//     // USER ID
+//     // --------------------------------------------------------
+
+//     if (userId !== undefined) {
+//       if (!isValidObjectId(userId)) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid userId",
+//         });
+//       }
+
+//       query.userId = userId;
+//     }
+
+//     // --------------------------------------------------------
+//     // EMAIL
+//     // --------------------------------------------------------
+
+//     if (email !== undefined) {
+//       const normalizedEmail =
+//         normalizeEmail(email);
+
+//       if (!normalizedEmail) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid email",
+//         });
+//       }
+
+//       query.email = normalizedEmail;
+//     }
+
+//     // --------------------------------------------------------
+//     // MONTH
+//     // --------------------------------------------------------
+
+//     if (month !== undefined) {
+//       const parsedMonth = parseMonth(month);
+
+//       if (parsedMonth === null) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Month must be an integer between 0 and 11",
+//         });
+//       }
+
+//       query.month = parsedMonth;
+//     }
+
+//     // --------------------------------------------------------
+//     // YEAR
+//     // --------------------------------------------------------
+
+//     if (year !== undefined) {
+//       const parsedYear = parseYear(year);
+
+//       if (parsedYear === null) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid year",
+//         });
+//       }
+
+//       query.year = parsedYear;
+//     }
+
+//     // --------------------------------------------------------
+//     // CATEGORY
+//     // --------------------------------------------------------
+
+//     if (
+//       category !== undefined &&
+//       String(category).trim().toLowerCase() !== "all"
+//     ) {
+//       const normalizedCategory =
+//         normalizeCategory(category);
+
+//       if (!normalizedCategory) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid category",
+//         });
+//       }
+
+//       query.category = normalizedCategory;
+//     }
+
+//     // --------------------------------------------------------
+//     // FIND
+//     // --------------------------------------------------------
+
+//     const budgets = await Budget.find(query).sort({
+//       year: -1,
+//       month: -1,
+//       category: 1,
+//     });
+
+//     // --------------------------------------------------------
+//     // SUMMARY
+//     // --------------------------------------------------------
+
+//     const totalAllocated =
+//       budgets.reduce(
+//         (sum, budget) =>
+//           sum +
+//           Number(
+//             budget.allocatedAmount || 0
+//           ),
+//         0
+//       );
+
+//     const totalSpent =
+//       budgets.reduce(
+//         (sum, budget) =>
+//           sum +
+//           Number(
+//             budget.spentAmount || 0
+//           ),
+//         0
+//       );
+
+//     const totalRemaining =
+//       budgets.reduce(
+//         (sum, budget) =>
+//           sum +
+//           Number(
+//             budget.remainingAmount || 0
+//           ),
+//         0
+//       );
+
+//     const percentage =
+//       totalAllocated > 0
+//         ? (totalSpent / totalAllocated) * 100
+//         : 0;
+
+//     return res.status(200).json({
+//       success: true,
+
+//       count: budgets.length,
+
+//       data: budgets,
+
+//       summary: {
+//         totalAllocated,
+//         totalSpent,
+//         totalRemaining,
+
+//         percentage: Number(
+//           percentage.toFixed(2)
+//         ),
+//       },
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Get budgets error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch budgets",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // GET BUDGETS BY EMAIL
+// // ============================================================
+
+// exports.getBudgetsByEmail = async (
 //   req,
 //   res
 // ) => {
+//   try {
+//     const { email } = req.params;
+
+//     if (!email) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email is required",
+//       });
+//     }
+
+//     const normalizedEmail =
+//       normalizeEmail(email);
+
+//     if (!normalizedEmail) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid email",
+//       });
+//     }
+
+//     const budgets = await Budget.find({
+//       email: normalizedEmail,
+//     }).sort({
+//       year: -1,
+//       month: -1,
+//       category: 1,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       count: budgets.length,
+//       data: budgets,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Get budgets by email error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch budgets",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // GET BUDGETS BY USER ID
+// // ============================================================
+
+// exports.getBudgetsByUserId = async (
+//   req,
+//   res
+// ) => {
+//   try {
+//     const { userId } = req.params;
+
+//     if (
+//       !userId ||
+//       !isValidObjectId(userId)
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid userId",
+//       });
+//     }
+
+//     const budgets = await Budget.find({
+//       userId,
+//     }).sort({
+//       year: -1,
+//       month: -1,
+//       category: 1,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       count: budgets.length,
+//       data: budgets,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Get budgets by userId error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+//       message:
+//         "Failed to fetch budgets by userId",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // GET SINGLE BUDGET
+// // ============================================================
+
+// exports.getBudget = async (
+//   req,
+//   res
+// ) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!isValidObjectId(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid budget ID",
+//       });
+//     }
+
+//     const budget =
+//       await Budget.findById(id);
+
+//     if (!budget) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Budget not found",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       data: budget,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Get budget error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch budget",
+//       error: error.message,
+//     });
+//   }
+// };
+
+// // ============================================================
+// // CREATE BUDGET
+// // ============================================================
+
+// // exports.createBudget = async (
+// //   req,
+// //   res
+// // ) => {
+// //   try {
+// //     const {
+// //       category,
+// //       allocatedAmount,
+// //       month,
+// //       year,
+// //       email,
+// //       description,
+// //       userId,
+// //     } = req.body;
+
+// //     // --------------------------------------------------------
+// //     // REQUIRED FIELDS
+// //     // --------------------------------------------------------
+
+// //     if (
+// //       !category ||
+// //       allocatedAmount === undefined ||
+// //       month === undefined ||
+// //       year === undefined ||
+// //       !email ||
+// //       !userId
+// //     ) {
+// //       return res.status(400).json({
+// //         success: false,
+// //         message:
+// //           "Category, allocatedAmount, month, year, email and userId are required",
+// //       });
+// //     }
+
+// //     // --------------------------------------------------------
+// //     // USER ID
+// //     // --------------------------------------------------------
+
+// //     if (!isValidObjectId(userId)) {
+// //       return res.status(400).json({
+// //         success: false,
+// //         message: "Invalid userId",
+// //       });
+// //     }
+
+// //     // --------------------------------------------------------
+// //     // CATEGORY
+// //     // --------------------------------------------------------
+
+// //     const normalizedCategory =
+// //       normalizeCategory(category);
+
+// //     if (!normalizedCategory) {
+// //       return res.status(400).json({
+// //         success: false,
+// //         message: "Category cannot be empty",
+// //       });
+// //     }
+
+// //     // --------------------------------------------------------
+// //     // AMOUNT
+// //     // --------------------------------------------------------
+
+// //     const amount =
+// //       parseNonNegativeWholeNumber(
+// //         allocatedAmount
+// //       );
+
+// //     if (amount === null) {
+// //       return res.status(400).json({
+// //         success: false,
+// //         message:
+// //           "Allocated amount must be a valid non-negative whole number",
+// //       });
+// //     }
+
+// //     // --------------------------------------------------------
+// //     // MONTH
+// //     // --------------------------------------------------------
+
+// //     const parsedMonth =
+// //       parseMonth(month);
+
+// //     if (parsedMonth === null) {
+// //       return res.status(400).json({
+// //         success: false,
+// //         message:
+// //           "Month must be an integer between 0 and 11",
+// //       });
+// //     }
+
+// //     // --------------------------------------------------------
+// //     // YEAR
+// //     // --------------------------------------------------------
+
+// //     const parsedYear =
+// //       parseYear(year);
+
+// //     if (parsedYear === null) {
+// //       return res.status(400).json({
+// //         success: false,
+// //         message: "Invalid year",
+// //       });
+// //     }
+
+// //     // --------------------------------------------------------
+// //     // EMAIL
+// //     // --------------------------------------------------------
+
+// //     const normalizedEmail =
+// //       normalizeEmail(email);
+
+// //     if (!normalizedEmail) {
+// //       return res.status(400).json({
+// //         success: false,
+// //         message: "Invalid email",
+// //       });
+// //     }
+
+// //     // --------------------------------------------------------
+// //     // DESCRIPTION
+// //     // --------------------------------------------------------
+
+// //     const normalizedDescription =
+// //       normalizeDescription(
+// //         description
+// //       );
+
+// //     // --------------------------------------------------------
+// //     // DUPLICATE CHECK
+// //     //
+// //     // Matches the unique index:
+// //     //
+// //     // userId + category + month + year
+// //     // --------------------------------------------------------
+
+// //     const existingBudget =
+// //       await Budget.findOne({
+// //         userId,
+// //         category: normalizedCategory,
+// //         month: parsedMonth,
+// //         year: parsedYear,
+// //       });
+
+// //     if (existingBudget) {
+// //       return res.status(409).json({
+// //         success: false,
+// //         message:
+// //           "A budget already exists for this category, month, year, and user.",
+// //       });
+// //     }
+
+// //     // --------------------------------------------------------
+// //     // CREATE
+// //     // --------------------------------------------------------
+
+// //     const budget =
+// //       await Budget.create({
+// //         category:
+// //           normalizedCategory,
+
+// //         allocatedAmount:
+// //           amount,
+
+// //         spentAmount: 0,
+
+// //         month:
+// //           parsedMonth,
+
+// //         year:
+// //           parsedYear,
+
+// //         email:
+// //           normalizedEmail,
+
+// //         userId,
+
+// //         description:
+// //           normalizedDescription,
+// //       });
+
+// //     // --------------------------------------------------------
+// //     // NOTIFICATION
+// //     // --------------------------------------------------------
+
+// //     let notification = null;
+
+// //     try {
+// //       notification =
+// //         await createNotification({
+// //           userId,
+
+// //           email:
+// //             normalizedEmail,
+
+// //           title:
+// //             "📊 Budget Created",
+
+// //           message:
+// //             `${normalizedCategory} budget created ` +
+// //             `with RWF ${amount.toLocaleString()}.`,
+
+// //           type: "info",
+
+// //           referenceId:
+// //             budget._id,
+
+// //           referenceModel:
+// //             "Budget",
+// //         });
+// //     } catch (notificationError) {
+// //       console.error(
+// //         "⚠️ Budget notification failed:",
+// //         notificationError
+// //       );
+// //     }
+
+// //     return res.status(201).json({
+// //       success: true,
+
+// //       message:
+// //         "Budget created successfully",
+
+// //       data: budget,
+
+// //       notification,
+// //     });
+// //   } catch (error) {
+// //     console.error(
+// //       "❌ CREATE BUDGET ERROR:",
+// //       error
+// //     );
+
+// //     // --------------------------------------------------------
+// //     // DUPLICATE KEY
+// //     // --------------------------------------------------------
+
+// //     if (error.code === 11000) {
+// //       return res.status(409).json({
+// //         success: false,
+
+// //         message:
+// //           "A budget already exists for this category, month, year, and user.",
+// //       });
+// //     }
+
+// //     // --------------------------------------------------------
+// //     // VALIDATION
+// //     // --------------------------------------------------------
+
+// //     if (
+// //       error.name ===
+// //       "ValidationError"
+// //     ) {
+// //       return res.status(400).json({
+// //         success: false,
+
+// //         message:
+// //           "Budget validation failed",
+
+// //         errors:
+// //           Object.values(
+// //             error.errors
+// //           ).map(
+// //             (err) =>
+// //               err.message
+// //           ),
+// //       });
+// //     }
+
+// //     return res.status(500).json({
+// //       success: false,
+
+// //       message:
+// //         "Failed to create budget",
+
+// //       error:
+// //         error.message,
+// //     });
+// //   }
+// // };
+
+// exports.createBudget = async (req, res) => {
+//   const session = await mongoose.startSession();
+
 //   try {
 //     const {
 //       category,
@@ -1284,66 +1556,267 @@ exports.getBudget = async (
 //     // --------------------------------------------------------
 
 //     const normalizedDescription =
-//       normalizeDescription(
-//         description
+//       normalizeDescription(description);
+
+//     // ========================================================
+//     // TRANSACTION
+//     // ========================================================
+
+//     let budget;
+//     let previousExpenses = [];
+//     let existingExpenseTotal = 0;
+
+//     await session.withTransaction(async () => {
+//       // ------------------------------------------------------
+//       // DUPLICATE CHECK
+//       // ------------------------------------------------------
+
+//       const existingBudget =
+//         await Budget.findOne({
+//           userId,
+//           category: normalizedCategory,
+//           month: parsedMonth,
+//           year: parsedYear,
+//         }).session(session);
+
+//       if (existingBudget) {
+//         const error =
+//           new Error(
+//             "A budget already exists for this category, month, year, and user."
+//           );
+
+//         error.statusCode = 409;
+
+//         throw error;
+//       }
+
+//       // ------------------------------------------------------
+//       // DATE RANGE
+//       //
+//       // Month is 0-11
+//       // ------------------------------------------------------
+
+//       const startDate = new Date(
+//         parsedYear,
+//         parsedMonth,
+//         1,
+//         0,
+//         0,
+//         0,
+//         0
 //       );
 
-//     // --------------------------------------------------------
-//     // DUPLICATE CHECK
-//     //
-//     // Matches the unique index:
-//     //
-//     // userId + category + month + year
-//     // --------------------------------------------------------
+//       const endDate = new Date(
+//         parsedYear,
+//         parsedMonth + 1,
+//         1,
+//         0,
+//         0,
+//         0,
+//         0
+//       );
 
-//     const existingBudget =
-//       await Budget.findOne({
-//         userId,
-//         category: normalizedCategory,
-//         month: parsedMonth,
-//         year: parsedYear,
-//       });
+//       // ------------------------------------------------------
+//       // FIND EXPENSES CREATED BEFORE THE BUDGET
+//       //
+//       // Match:
+//       // userId
+//       // category
+//       // email
+//       // expense date month
+//       // expense date year
+//       // type = expense
+//       // ------------------------------------------------------
 
-//     if (existingBudget) {
-//       return res.status(409).json({
-//         success: false,
-//         message:
-//           "A budget already exists for this category, month, year, and user.",
-//       });
-//     }
+//       previousExpenses =
+//         await Expense.find({
+//           userId,
+//           email: normalizedEmail,
+//           category: normalizedCategory,
+//           type: "expense",
+//           date: {
+//             $gte: startDate,
+//             $lt: endDate,
+//           },
+//         }).session(session);
 
-//     // --------------------------------------------------------
-//     // CREATE
-//     // --------------------------------------------------------
+//       // ------------------------------------------------------
+//       // CALCULATE ALREADY USED MONEY
+//       // ------------------------------------------------------
 
-//     const budget =
-//       await Budget.create({
-//         category:
-//           normalizedCategory,
+//       existingExpenseTotal =
+//         previousExpenses.reduce(
+//           (total, expense) => {
+//             return (
+//               total +
+//               Number(expense.amount || 0)
+//             );
+//           },
+//           0
+//         );
 
-//         allocatedAmount:
-//           amount,
+//       // ------------------------------------------------------
+//       // CALCULATE BUDGET VALUES
+//       // ------------------------------------------------------
 
-//         spentAmount: 0,
+//       const spentAmount =
+//         existingExpenseTotal;
 
-//         month:
-//           parsedMonth,
+//       const remainingAmount =
+//         amount - spentAmount;
 
-//         year:
-//           parsedYear,
+//       let percentageUsed = 0;
 
-//         email:
-//           normalizedEmail,
+//       if (amount > 0) {
+//         percentageUsed =
+//           (spentAmount / amount) * 100;
+//       }
 
-//         userId,
+//       // ------------------------------------------------------
+//       // DETERMINE STATUS
+//       // ------------------------------------------------------
 
-//         description:
-//           normalizedDescription,
-//       });
+//       let status = "on-track";
 
-//     // --------------------------------------------------------
+//       if (amount === 0) {
+//         status =
+//           spentAmount > 0
+//             ? "over-budget"
+//             : "under-budget";
+//       } else if (
+//         spentAmount > amount
+//       ) {
+//         status = "over-budget";
+//       } else if (
+//         spentAmount >= amount * 0.8
+//       ) {
+//         status =
+//           "approaching-limit";
+//       } else {
+//         status = "on-track";
+//       }
+
+//       // ------------------------------------------------------
+//       // CREATE BUDGET
+//       // ------------------------------------------------------
+
+//       const createdBudgets =
+//         await Budget.create(
+//           [
+//             {
+//               category:
+//                 normalizedCategory,
+
+//               allocatedAmount:
+//                 amount,
+
+//               spentAmount:
+//                 spentAmount,
+
+//               remainingAmount:
+//                 remainingAmount,
+
+//               percentageUsed:
+//                 percentageUsed,
+
+//               status:
+//                 status,
+
+//               month:
+//                 parsedMonth,
+
+//               year:
+//                 parsedYear,
+
+//               email:
+//                 normalizedEmail,
+
+//               userId,
+
+//               description:
+//                 normalizedDescription,
+//             },
+//           ],
+//           {
+//             session,
+//           }
+//         );
+
+//       budget =
+//         createdBudgets[0];
+
+//       // ------------------------------------------------------
+//       // LINK OLD EXPENSES TO THE NEW BUDGET
+//       //
+//       // These expenses existed before the budget.
+//       // They now become part of the budget usage.
+//       // ------------------------------------------------------
+
+//       if (
+//         previousExpenses.length > 0
+//       ) {
+//         await Expense.updateMany(
+//           {
+//             _id: {
+//               $in:
+//                 previousExpenses.map(
+//                   (expense) =>
+//                     expense._id
+//                 ),
+//             },
+//           },
+//           {
+//             $set: {
+//               budgetId:
+//                 budget._id,
+
+//               budgetAmountUsed:
+//                 // Each matching expense uses
+//                 // its own amount from this budget.
+//                 undefined,
+//             },
+//           },
+//           {
+//             session,
+//           }
+//         );
+
+//         // ----------------------------------------------------
+//         // IMPORTANT:
+//         // We cannot use undefined in MongoDB as a useful
+//         // stored value. Update budgetAmountUsed separately.
+//         // ----------------------------------------------------
+
+//         for (
+//           const expense of previousExpenses
+//         ) {
+//           await Expense.updateOne(
+//             {
+//               _id:
+//                 expense._id,
+//             },
+//             {
+//               $set: {
+//                 budgetId:
+//                   budget._id,
+
+//                 budgetAmountUsed:
+//                   Number(
+//                     expense.amount || 0
+//                   ),
+//               },
+//             },
+//             {
+//               session,
+//             }
+//           );
+//         }
+//       }
+//     });
+
+//     // ========================================================
 //     // NOTIFICATION
-//     // --------------------------------------------------------
+//     // ========================================================
 
 //     let notification = null;
 
@@ -1360,7 +1833,10 @@ exports.getBudget = async (
 
 //           message:
 //             `${normalizedCategory} budget created ` +
-//             `with RWF ${amount.toLocaleString()}.`,
+//             `with RWF ${amount.toLocaleString()}. ` +
+//             `Existing expenses of RWF ` +
+//             `${existingExpenseTotal.toLocaleString()} ` +
+//             `were automatically included.`,
 
 //           type: "info",
 
@@ -1377,6 +1853,10 @@ exports.getBudget = async (
 //       );
 //     }
 
+//     // ========================================================
+//     // RESPONSE
+//     // ========================================================
+
 //     return res.status(201).json({
 //       success: true,
 
@@ -1384,6 +1864,37 @@ exports.getBudget = async (
 //         "Budget created successfully",
 
 //       data: budget,
+
+//       budgetSummary: {
+//         allocatedAmount:
+//           Number(
+//             budget.allocatedAmount || 0
+//           ),
+
+//         spentAmount:
+//           Number(
+//             budget.spentAmount || 0
+//           ),
+
+//         remainingAmount:
+//           Number(
+//             budget.remainingAmount || 0
+//           ),
+
+//         percentageUsed:
+//           Number(
+//             budget.percentageUsed || 0
+//           ),
+
+//         status:
+//           budget.status,
+
+//         previousExpensesCount:
+//           previousExpenses.length,
+
+//         previousExpensesAmount:
+//           existingExpenseTotal,
+//       },
 
 //       notification,
 //     });
@@ -1394,7 +1905,287 @@ exports.getBudget = async (
 //     );
 
 //     // --------------------------------------------------------
-//     // DUPLICATE KEY
+//     // DUPLICATE BUDGET
+//     // --------------------------------------------------------
+
+//     if (
+//       error.statusCode === 409 ||
+//       error.code === 11000
+//     ) {
+//       return res.status(409).json({
+//         success: false,
+
+//         message:
+//           "A budget already exists for this category, month, year, and user.",
+//       });
+//     }
+
+//     // --------------------------------------------------------
+//     // VALIDATION
+//     // --------------------------------------------------------
+
+//     if (
+//       error.name ===
+//       "ValidationError"
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+
+//         message:
+//           "Budget validation failed",
+
+//         errors:
+//           Object.values(
+//             error.errors
+//           ).map(
+//             (err) =>
+//               err.message
+//           ),
+//       });
+//     }
+
+//     return res.status(500).json({
+//       success: false,
+
+//       message:
+//         error.message ||
+//         "Failed to create budget",
+//     });
+//   } finally {
+//     await session.endSession();
+//   }
+// };
+
+// // ============================================================
+// // UPDATE BUDGET
+// //
+// // IMPORTANT:
+// //
+// // This controller does NOT modify:
+// //
+// // - spentAmount
+// // - remainingAmount
+// // - percentageUsed
+// // - status
+// //
+// // Those values are controlled by the Expense system.
+// //
+// // It also does NOT allow changing:
+// //
+// // - userId
+// // - email
+// //
+// // This prevents ownership from accidentally changing.
+// // ============================================================
+
+// exports.updateBudget = async (
+//   req,
+//   res
+// ) => {
+//   try {
+//     const { id } = req.params;
+
+//     // --------------------------------------------------------
+//     // ID
+//     // --------------------------------------------------------
+
+//     if (!isValidObjectId(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid budget ID",
+//       });
+//     }
+
+//     // --------------------------------------------------------
+//     // FIND
+//     // --------------------------------------------------------
+
+//     const budget =
+//       await Budget.findById(id);
+
+//     if (!budget) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Budget not found",
+//       });
+//     }
+
+//     const {
+//       category,
+//       allocatedAmount,
+//       month,
+//       year,
+//       description,
+//     } = req.body;
+
+//     // --------------------------------------------------------
+//     // CATEGORY
+//     // --------------------------------------------------------
+
+//     if (category !== undefined) {
+//       if (
+//         typeof category !==
+//           "string" ||
+//         !category.trim()
+//       ) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Category cannot be empty",
+//         });
+//       }
+
+//       budget.category =
+//         normalizeCategory(
+//           category
+//         );
+//     }
+
+//     // --------------------------------------------------------
+//     // ALLOCATED AMOUNT
+//     // --------------------------------------------------------
+
+//     if (
+//       allocatedAmount !==
+//       undefined
+//     ) {
+//       const amount =
+//         parseNonNegativeWholeNumber(
+//           allocatedAmount
+//         );
+
+//       if (amount === null) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Allocated amount must be a valid non-negative whole number",
+//         });
+//       }
+
+//       budget.allocatedAmount =
+//         amount;
+//     }
+
+//     // --------------------------------------------------------
+//     // MONTH
+//     // --------------------------------------------------------
+
+//     if (month !== undefined) {
+//       const parsedMonth =
+//         parseMonth(month);
+
+//       if (parsedMonth === null) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Month must be an integer between 0 and 11",
+//         });
+//       }
+
+//       budget.month =
+//         parsedMonth;
+//     }
+
+//     // --------------------------------------------------------
+//     // YEAR
+//     // --------------------------------------------------------
+
+//     if (year !== undefined) {
+//       const parsedYear =
+//         parseYear(year);
+
+//       if (parsedYear === null) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "Invalid year",
+//         });
+//       }
+
+//       budget.year =
+//         parsedYear;
+//     }
+
+//     // --------------------------------------------------------
+//     // DESCRIPTION
+//     // --------------------------------------------------------
+
+//     if (
+//       description !==
+//       undefined
+//     ) {
+//       budget.description =
+//         normalizeDescription(
+//           description
+//         );
+//     }
+
+//     // --------------------------------------------------------
+//     // IMPORTANT
+//     //
+//     // NEVER DO:
+//     //
+//     // budget.spentAmount = 0
+//     //
+//     // The current spent amount must remain intact.
+//     // --------------------------------------------------------
+
+//     await budget.save();
+
+//     // --------------------------------------------------------
+//     // NOTIFICATION
+//     // --------------------------------------------------------
+
+//     let notification = null;
+
+//     try {
+//       notification =
+//         await createNotification({
+//           userId:
+//             budget.userId,
+
+//           email:
+//             budget.email,
+
+//           title:
+//             "📊 Budget Updated",
+
+//           message:
+//             `${budget.category} budget was updated.`,
+
+//           type: "info",
+
+//           referenceId:
+//             budget._id,
+
+//           referenceModel:
+//             "Budget",
+//         });
+//     } catch (notificationError) {
+//       console.error(
+//         "⚠️ Budget update notification failed:",
+//         notificationError
+//       );
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+
+//       message:
+//         "Budget updated successfully",
+
+//       data: budget,
+
+//       notification,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Update budget error:",
+//       error
+//     );
+
+//     // --------------------------------------------------------
+//     // DUPLICATE
 //     // --------------------------------------------------------
 
 //     if (error.code === 11000) {
@@ -1434,13 +2225,555 @@ exports.getBudget = async (
 //       success: false,
 
 //       message:
-//         "Failed to create budget",
+//         "Failed to update budget",
 
 //       error:
 //         error.message,
 //     });
 //   }
 // };
+
+// // ============================================================
+// // DELETE BUDGET
+// //
+// // IMPORTANT:
+// //
+// // Deleting a budget does NOT delete expenses.
+// //
+// // Expense records remain historical records.
+// // ============================================================
+
+// exports.deleteBudget = async (
+//   req,
+//   res
+// ) => {
+//   try {
+//     const { id } = req.params;
+
+//     // --------------------------------------------------------
+//     // ID
+//     // --------------------------------------------------------
+
+//     if (!isValidObjectId(id)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid budget ID",
+//       });
+//     }
+
+//     // --------------------------------------------------------
+//     // FIND
+//     // --------------------------------------------------------
+
+//     const budget =
+//       await Budget.findById(id);
+
+//     if (!budget) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Budget not found",
+//       });
+//     }
+
+//     // --------------------------------------------------------
+//     // SAVE INFORMATION
+//     // --------------------------------------------------------
+
+//     const budgetId =
+//       budget._id;
+
+//     const budgetEmail =
+//       budget.email;
+
+//     const budgetUserId =
+//       budget.userId;
+
+//     const budgetCategory =
+//       budget.category;
+
+//     // --------------------------------------------------------
+//     // DELETE
+//     // --------------------------------------------------------
+
+//     await budget.deleteOne();
+
+//     // --------------------------------------------------------
+//     // NOTIFICATION
+//     // --------------------------------------------------------
+
+//     let notification = null;
+
+//     try {
+//       notification =
+//         await createNotification({
+//           userId:
+//             budgetUserId,
+
+//           email:
+//             budgetEmail,
+
+//           title:
+//             "🗑️ Budget Deleted",
+
+//           message:
+//             `${budgetCategory} budget was deleted.`,
+
+//           type: "warning",
+
+//           referenceId:
+//             budgetId,
+
+//           referenceModel:
+//             "Budget",
+//         });
+//     } catch (notificationError) {
+//       console.error(
+//         "⚠️ Budget deletion notification failed:",
+//         notificationError
+//       );
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+
+//       message:
+//         "Budget deleted successfully",
+
+//       notification,
+//     });
+//   } catch (error) {
+//     console.error(
+//       "❌ Delete budget error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+
+//       message:
+//         "Failed to delete budget",
+
+//       error:
+//         error.message,
+//     });
+//   }
+// };
+
+// ============================================================
+// CONTROLLERS / BUDGETCONTROLLER.JS
+// ============================================================
+
+const mongoose = require("mongoose");
+
+const Budget = require("../models/Budget");
+const Expense = require("../models/Expense");
+
+// ============================================================
+// NOTIFICATION HELPER
+// ============================================================
+
+const createNotification = require("../utils/createNotification");
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+const normalizeEmail = (email) =>
+  String(email || "")
+    .trim()
+    .toLowerCase();
+
+const normalizeCategory = (category) =>
+  String(category || "")
+    .trim()
+    .toLowerCase();
+
+const normalizeDescription = (description) => String(description || "").trim();
+
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+// ============================================================
+// NUMBER HELPERS
+// ============================================================
+
+const parseWholeNumber = (value) => {
+  const number = Number(value);
+
+  if (!Number.isFinite(number) || !Number.isInteger(number)) {
+    return null;
+  }
+
+  return number;
+};
+
+const parseNonNegativeWholeNumber = (value) => {
+  const number = parseWholeNumber(value);
+
+  if (number === null || number < 0) {
+    return null;
+  }
+
+  return number;
+};
+
+// ============================================================
+// MONTH
+// ============================================================
+
+const parseMonth = (value) => {
+  const month = Number(value);
+
+  if (!Number.isInteger(month) || month < 0 || month > 11) {
+    return null;
+  }
+
+  return month;
+};
+
+// ============================================================
+// YEAR
+// ============================================================
+
+const parseYear = (value) => {
+  const year = Number(value);
+
+  if (!Number.isInteger(year) || year < 2000) {
+    return null;
+  }
+
+  return year;
+};
+
+// ============================================================
+// CALCULATE BUDGET VALUES
+// ============================================================
+
+const calculateBudgetValues = (allocatedAmount, spentAmount) => {
+  const allocated = Number(allocatedAmount) || 0;
+
+  const spent = Number(spentAmount) || 0;
+
+  const remaining = Math.max(allocated - spent, 0);
+
+  const percentage =
+    allocated > 0 ? Number(((spent / allocated) * 100).toFixed(2)) : 0;
+
+  let status = "on-track";
+
+  if (spent > allocated) {
+    status = "over-budget";
+  } else if (allocated === 0) {
+    status = "under-budget";
+  } else if (percentage >= 80) {
+    status = "approaching-limit";
+  }
+
+  return {
+    spentAmount: spent,
+    remainingAmount: remaining,
+    percentageUsed: percentage,
+    status,
+  };
+};
+
+// ============================================================
+// GET ALL BUDGETS
+// ============================================================
+
+exports.getBudgets = async (req, res) => {
+  try {
+    const { userId, email, month, year, category } = req.query;
+
+    const query = {};
+
+    // --------------------------------------------------------
+    // USER ID
+    // --------------------------------------------------------
+
+    if (userId !== undefined) {
+      if (!isValidObjectId(userId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid userId",
+        });
+      }
+
+      query.userId = userId;
+    }
+
+    // --------------------------------------------------------
+    // EMAIL
+    // --------------------------------------------------------
+
+    if (email !== undefined) {
+      const normalizedEmail = normalizeEmail(email);
+
+      if (!normalizedEmail) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid email",
+        });
+      }
+
+      query.email = normalizedEmail;
+    }
+
+    // --------------------------------------------------------
+    // MONTH
+    // --------------------------------------------------------
+
+    if (month !== undefined) {
+      const parsedMonth = parseMonth(month);
+
+      if (parsedMonth === null) {
+        return res.status(400).json({
+          success: false,
+          message: "Month must be an integer between 0 and 11",
+        });
+      }
+
+      query.month = parsedMonth;
+    }
+
+    // --------------------------------------------------------
+    // YEAR
+    // --------------------------------------------------------
+
+    if (year !== undefined) {
+      const parsedYear = parseYear(year);
+
+      if (parsedYear === null) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid year",
+        });
+      }
+
+      query.year = parsedYear;
+    }
+
+    // --------------------------------------------------------
+    // CATEGORY
+    // --------------------------------------------------------
+
+    if (
+      category !== undefined &&
+      String(category).trim().toLowerCase() !== "all"
+    ) {
+      const normalizedCategory = normalizeCategory(category);
+
+      if (!normalizedCategory) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid category",
+        });
+      }
+
+      query.category = normalizedCategory;
+    }
+
+    // --------------------------------------------------------
+    // FIND
+    // --------------------------------------------------------
+
+    const budgets = await Budget.find(query).sort({
+      year: -1,
+      month: -1,
+      category: 1,
+    });
+
+    // --------------------------------------------------------
+    // SUMMARY
+    // --------------------------------------------------------
+
+    const totalAllocated = budgets.reduce(
+      (sum, budget) => sum + Number(budget.allocatedAmount || 0),
+      0,
+    );
+
+    const totalSpent = budgets.reduce(
+      (sum, budget) => sum + Number(budget.spentAmount || 0),
+      0,
+    );
+
+    const totalRemaining = budgets.reduce(
+      (sum, budget) => sum + Number(budget.remainingAmount || 0),
+      0,
+    );
+
+    const percentage =
+      totalAllocated > 0
+        ? Number(((totalSpent / totalAllocated) * 100).toFixed(2))
+        : 0;
+
+    return res.status(200).json({
+      success: true,
+      count: budgets.length,
+      data: budgets,
+
+      summary: {
+        totalAllocated,
+        totalSpent,
+        totalRemaining,
+        percentage,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Get budgets error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch budgets",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// GET BUDGETS BY EMAIL
+// ============================================================
+
+exports.getBudgetsByEmail = async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email",
+      });
+    }
+
+    const budgets = await Budget.find({
+      email: normalizedEmail,
+    }).sort({
+      year: -1,
+      month: -1,
+      category: 1,
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: budgets.length,
+      data: budgets,
+    });
+  } catch (error) {
+    console.error("❌ Get budgets by email error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch budgets",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// GET BUDGETS BY USER ID
+// ============================================================
+
+exports.getBudgetsByUserId = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId || !isValidObjectId(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId",
+      });
+    }
+
+    const budgets = await Budget.find({
+      userId,
+    }).sort({
+      year: -1,
+      month: -1,
+      category: 1,
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: budgets.length,
+      data: budgets,
+    });
+  } catch (error) {
+    console.error("❌ Get budgets by userId error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch budgets by userId",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// GET SINGLE BUDGET
+// ============================================================
+
+exports.getBudget = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid budget ID",
+      });
+    }
+
+    const budget = await Budget.findById(id);
+
+    if (!budget) {
+      return res.status(404).json({
+        success: false,
+        message: "Budget not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: budget,
+    });
+  } catch (error) {
+    console.error("❌ Get budget error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch budget",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================
+// CREATE BUDGET
+//
+// IMPORTANT:
+//
+// If expenses already exist for the same:
+//
+// userId
+// email
+// category
+// month
+// year
+//
+// they are automatically included in spentAmount.
+//
+// Example:
+//
+// Budget = 100,000
+// Existing expenses = 30,000
+//
+// spentAmount = 30,000
+// remainingAmount = 70,000
+// percentageUsed = 30
+//
+// Those expenses are also linked to budgetId.
+// ============================================================
 
 exports.createBudget = async (req, res) => {
   const session = await mongoose.startSession();
@@ -1490,8 +2823,7 @@ exports.createBudget = async (req, res) => {
     // CATEGORY
     // --------------------------------------------------------
 
-    const normalizedCategory =
-      normalizeCategory(category);
+    const normalizedCategory = normalizeCategory(category);
 
     if (!normalizedCategory) {
       return res.status(400).json({
@@ -1504,16 +2836,12 @@ exports.createBudget = async (req, res) => {
     // AMOUNT
     // --------------------------------------------------------
 
-    const amount =
-      parseNonNegativeWholeNumber(
-        allocatedAmount
-      );
+    const amount = parseNonNegativeWholeNumber(allocatedAmount);
 
     if (amount === null) {
       return res.status(400).json({
         success: false,
-        message:
-          "Allocated amount must be a valid non-negative whole number",
+        message: "Allocated amount must be a valid non-negative whole number",
       });
     }
 
@@ -1521,14 +2849,12 @@ exports.createBudget = async (req, res) => {
     // MONTH
     // --------------------------------------------------------
 
-    const parsedMonth =
-      parseMonth(month);
+    const parsedMonth = parseMonth(month);
 
     if (parsedMonth === null) {
       return res.status(400).json({
         success: false,
-        message:
-          "Month must be an integer between 0 and 11",
+        message: "Month must be an integer between 0 and 11",
       });
     }
 
@@ -1536,8 +2862,7 @@ exports.createBudget = async (req, res) => {
     // YEAR
     // --------------------------------------------------------
 
-    const parsedYear =
-      parseYear(year);
+    const parsedYear = parseYear(year);
 
     if (parsedYear === null) {
       return res.status(400).json({
@@ -1550,8 +2875,7 @@ exports.createBudget = async (req, res) => {
     // EMAIL
     // --------------------------------------------------------
 
-    const normalizedEmail =
-      normalizeEmail(email);
+    const normalizedEmail = normalizeEmail(email);
 
     if (!normalizedEmail) {
       return res.status(400).json({
@@ -1564,262 +2888,132 @@ exports.createBudget = async (req, res) => {
     // DESCRIPTION
     // --------------------------------------------------------
 
-    const normalizedDescription =
-      normalizeDescription(description);
+    const normalizedDescription = normalizeDescription(description);
+
+    let budget = null;
+    let previousExpenses = [];
+    let existingExpenseTotal = 0;
 
     // ========================================================
     // TRANSACTION
     // ========================================================
 
-    let budget;
-    let previousExpenses = [];
-    let existingExpenseTotal = 0;
-
     await session.withTransaction(async () => {
-      // ------------------------------------------------------
+      // ----------------------------------------------------
       // DUPLICATE CHECK
-      // ------------------------------------------------------
+      // ----------------------------------------------------
 
-      const existingBudget =
-        await Budget.findOne({
-          userId,
-          category: normalizedCategory,
-          month: parsedMonth,
-          year: parsedYear,
-        }).session(session);
+      const existingBudget = await Budget.findOne({
+        userId,
+        category: normalizedCategory,
+        month: parsedMonth,
+        year: parsedYear,
+      }).session(session);
 
       if (existingBudget) {
-        const error =
-          new Error(
-            "A budget already exists for this category, month, year, and user."
-          );
+        const error = new Error(
+          "A budget already exists for this category, month, year, and user.",
+        );
 
         error.statusCode = 409;
 
         throw error;
       }
 
-      // ------------------------------------------------------
+      // ----------------------------------------------------
       // DATE RANGE
-      //
-      // Month is 0-11
-      // ------------------------------------------------------
+      // ----------------------------------------------------
 
-      const startDate = new Date(
-        parsedYear,
-        parsedMonth,
-        1,
-        0,
-        0,
-        0,
-        0
-      );
+      const startDate = new Date(parsedYear, parsedMonth, 1, 0, 0, 0, 0);
 
-      const endDate = new Date(
-        parsedYear,
-        parsedMonth + 1,
-        1,
-        0,
-        0,
-        0,
-        0
-      );
+      const endDate = new Date(parsedYear, parsedMonth + 1, 1, 0, 0, 0, 0);
 
-      // ------------------------------------------------------
-      // FIND EXPENSES CREATED BEFORE THE BUDGET
-      //
-      // Match:
-      // userId
-      // category
-      // email
-      // expense date month
-      // expense date year
-      // type = expense
-      // ------------------------------------------------------
+      // ----------------------------------------------------
+      // FIND EXISTING EXPENSES
+      // ----------------------------------------------------
 
-      previousExpenses =
-        await Expense.find({
-          userId,
-          email: normalizedEmail,
-          category: normalizedCategory,
-          type: "expense",
-          date: {
-            $gte: startDate,
-            $lt: endDate,
-          },
-        }).session(session);
+      previousExpenses = await Expense.find({
+        userId,
+        email: normalizedEmail,
+        category: normalizedCategory,
+        type: "expense",
+        date: {
+          $gte: startDate,
+          $lt: endDate,
+        },
+      }).session(session);
 
-      // ------------------------------------------------------
-      // CALCULATE ALREADY USED MONEY
-      // ------------------------------------------------------
+      // ----------------------------------------------------
+      // TOTAL PREVIOUS EXPENSES
+      // ----------------------------------------------------
 
-      existingExpenseTotal =
-        previousExpenses.reduce(
-          (total, expense) => {
-            return (
-              total +
-              Number(expense.amount || 0)
-            );
-          },
-          0
-        );
+      existingExpenseTotal = previousExpenses.reduce((total, expense) => {
+        return total + Number(expense.amount || 0);
+      }, 0);
 
-      // ------------------------------------------------------
-      // CALCULATE BUDGET VALUES
-      // ------------------------------------------------------
+      // ----------------------------------------------------
+      // CALCULATE VALUES
+      // ----------------------------------------------------
 
-      const spentAmount =
-        existingExpenseTotal;
+      const values = calculateBudgetValues(amount, existingExpenseTotal);
 
-      const remainingAmount =
-        amount - spentAmount;
-
-      let percentageUsed = 0;
-
-      if (amount > 0) {
-        percentageUsed =
-          (spentAmount / amount) * 100;
-      }
-
-      // ------------------------------------------------------
-      // DETERMINE STATUS
-      // ------------------------------------------------------
-
-      let status = "on-track";
-
-      if (amount === 0) {
-        status =
-          spentAmount > 0
-            ? "over-budget"
-            : "under-budget";
-      } else if (
-        spentAmount > amount
-      ) {
-        status = "over-budget";
-      } else if (
-        spentAmount >= amount * 0.8
-      ) {
-        status =
-          "approaching-limit";
-      } else {
-        status = "on-track";
-      }
-
-      // ------------------------------------------------------
+      // ----------------------------------------------------
       // CREATE BUDGET
-      // ------------------------------------------------------
+      // ----------------------------------------------------
 
-      const createdBudgets =
-        await Budget.create(
-          [
-            {
-              category:
-                normalizedCategory,
-
-              allocatedAmount:
-                amount,
-
-              spentAmount:
-                spentAmount,
-
-              remainingAmount:
-                remainingAmount,
-
-              percentageUsed:
-                percentageUsed,
-
-              status:
-                status,
-
-              month:
-                parsedMonth,
-
-              year:
-                parsedYear,
-
-              email:
-                normalizedEmail,
-
-              userId,
-
-              description:
-                normalizedDescription,
-            },
-          ],
+      const createdBudgets = await Budget.create(
+        [
           {
-            session,
-          }
-        );
+            category: normalizedCategory,
 
-      budget =
-        createdBudgets[0];
+            allocatedAmount: amount,
 
-      // ------------------------------------------------------
-      // LINK OLD EXPENSES TO THE NEW BUDGET
-      //
-      // These expenses existed before the budget.
-      // They now become part of the budget usage.
-      // ------------------------------------------------------
+            spentAmount: values.spentAmount,
 
-      if (
-        previousExpenses.length > 0
-      ) {
-        await Expense.updateMany(
+            remainingAmount: values.remainingAmount,
+
+            percentageUsed: values.percentageUsed,
+
+            status: values.status,
+
+            month: parsedMonth,
+
+            year: parsedYear,
+
+            email: normalizedEmail,
+
+            userId,
+
+            description: normalizedDescription,
+          },
+        ],
+        {
+          session,
+        },
+      );
+
+      budget = createdBudgets[0];
+
+      // ----------------------------------------------------
+      // LINK PREVIOUS EXPENSES
+      // ----------------------------------------------------
+
+      for (const expense of previousExpenses) {
+        await Expense.updateOne(
           {
-            _id: {
-              $in:
-                previousExpenses.map(
-                  (expense) =>
-                    expense._id
-                ),
-            },
+            _id: expense._id,
           },
           {
             $set: {
-              budgetId:
-                budget._id,
+              budgetId: budget._id,
 
-              budgetAmountUsed:
-                // Each matching expense uses
-                // its own amount from this budget.
-                undefined,
+              budgetAmountUsed: Number(expense.amount || 0),
             },
           },
           {
             session,
-          }
+          },
         );
-
-        // ----------------------------------------------------
-        // IMPORTANT:
-        // We cannot use undefined in MongoDB as a useful
-        // stored value. Update budgetAmountUsed separately.
-        // ----------------------------------------------------
-
-        for (
-          const expense of previousExpenses
-        ) {
-          await Expense.updateOne(
-            {
-              _id:
-                expense._id,
-            },
-            {
-              $set: {
-                budgetId:
-                  budget._id,
-
-                budgetAmountUsed:
-                  Number(
-                    expense.amount || 0
-                  ),
-              },
-            },
-            {
-              session,
-            }
-          );
-        }
       }
     });
 
@@ -1830,36 +3024,28 @@ exports.createBudget = async (req, res) => {
     let notification = null;
 
     try {
-      notification =
-        await createNotification({
-          userId,
+      notification = await createNotification({
+        userId,
 
-          email:
-            normalizedEmail,
+        email: normalizedEmail,
 
-          title:
-            "📊 Budget Created",
+        title: "📊 Budget Created",
 
-          message:
-            `${normalizedCategory} budget created ` +
-            `with RWF ${amount.toLocaleString()}. ` +
-            `Existing expenses of RWF ` +
-            `${existingExpenseTotal.toLocaleString()} ` +
-            `were automatically included.`,
+        message:
+          `${normalizedCategory} budget created with ` +
+          `RWF ${amount.toLocaleString()}. ` +
+          `Existing expenses of RWF ` +
+          `${existingExpenseTotal.toLocaleString()} ` +
+          `were included.`,
 
-          type: "info",
+        type: "info",
 
-          referenceId:
-            budget._id,
+        referenceId: budget._id,
 
-          referenceModel:
-            "Budget",
-        });
+        referenceModel: "Budget",
+      });
     } catch (notificationError) {
-      console.error(
-        "⚠️ Budget notification failed:",
-        notificationError
-      );
+      console.error("⚠️ Budget notification failed:", notificationError);
     }
 
     // ========================================================
@@ -1869,96 +3055,51 @@ exports.createBudget = async (req, res) => {
     return res.status(201).json({
       success: true,
 
-      message:
-        "Budget created successfully",
+      message: "Budget created successfully",
 
       data: budget,
 
       budgetSummary: {
-        allocatedAmount:
-          Number(
-            budget.allocatedAmount || 0
-          ),
+        allocatedAmount: budget.allocatedAmount,
 
-        spentAmount:
-          Number(
-            budget.spentAmount || 0
-          ),
+        spentAmount: budget.spentAmount,
 
-        remainingAmount:
-          Number(
-            budget.remainingAmount || 0
-          ),
+        remainingAmount: budget.remainingAmount,
 
-        percentageUsed:
-          Number(
-            budget.percentageUsed || 0
-          ),
+        percentageUsed: budget.percentageUsed,
 
-        status:
-          budget.status,
+        status: budget.status,
 
-        previousExpensesCount:
-          previousExpenses.length,
+        previousExpensesCount: previousExpenses.length,
 
-        previousExpensesAmount:
-          existingExpenseTotal,
+        previousExpensesAmount: existingExpenseTotal,
       },
 
       notification,
     });
   } catch (error) {
-    console.error(
-      "❌ CREATE BUDGET ERROR:",
-      error
-    );
+    console.error("❌ CREATE BUDGET ERROR:", error);
 
-    // --------------------------------------------------------
-    // DUPLICATE BUDGET
-    // --------------------------------------------------------
-
-    if (
-      error.statusCode === 409 ||
-      error.code === 11000
-    ) {
+    if (error.statusCode === 409 || error.code === 11000) {
       return res.status(409).json({
         success: false,
-
         message:
           "A budget already exists for this category, month, year, and user.",
       });
     }
 
-    // --------------------------------------------------------
-    // VALIDATION
-    // --------------------------------------------------------
-
-    if (
-      error.name ===
-      "ValidationError"
-    ) {
+    if (error.name === "ValidationError") {
       return res.status(400).json({
         success: false,
+        message: "Budget validation failed",
 
-        message:
-          "Budget validation failed",
-
-        errors:
-          Object.values(
-            error.errors
-          ).map(
-            (err) =>
-              err.message
-          ),
+        errors: Object.values(error.errors).map((err) => err.message),
       });
     }
 
     return res.status(500).json({
       success: false,
-
-      message:
-        error.message ||
-        "Failed to create budget",
+      message: error.message || "Failed to create budget",
     });
   } finally {
     await session.endSession();
@@ -1968,35 +3109,21 @@ exports.createBudget = async (req, res) => {
 // ============================================================
 // UPDATE BUDGET
 //
-// IMPORTANT:
+// Changing allocated amount automatically recalculates:
 //
-// This controller does NOT modify:
+// spentAmount
+// remainingAmount
+// percentageUsed
+// status
 //
-// - spentAmount
-// - remainingAmount
-// - percentageUsed
-// - status
-//
-// Those values are controlled by the Expense system.
-//
-// It also does NOT allow changing:
-//
-// - userId
-// - email
-//
-// This prevents ownership from accidentally changing.
+// Existing expenses remain attached to the budget.
 // ============================================================
 
-exports.updateBudget = async (
-  req,
-  res
-) => {
+exports.updateBudget = async (req, res) => {
+  const session = await mongoose.startSession();
+
   try {
     const { id } = req.params;
-
-    // --------------------------------------------------------
-    // ID
-    // --------------------------------------------------------
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -2005,240 +3132,270 @@ exports.updateBudget = async (
       });
     }
 
-    // --------------------------------------------------------
-    // FIND
-    // --------------------------------------------------------
+    let budget;
 
-    const budget =
-      await Budget.findById(id);
+    await session.withTransaction(async () => {
+      budget = await Budget.findById(id).session(session);
 
-    if (!budget) {
-      return res.status(404).json({
-        success: false,
-        message: "Budget not found",
-      });
-    }
+      if (!budget) {
+        const error = new Error("Budget not found");
 
-    const {
-      category,
-      allocatedAmount,
-      month,
-      year,
-      description,
-    } = req.body;
+        error.statusCode = 404;
 
-    // --------------------------------------------------------
-    // CATEGORY
-    // --------------------------------------------------------
-
-    if (category !== undefined) {
-      if (
-        typeof category !==
-          "string" ||
-        !category.trim()
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Category cannot be empty",
-        });
+        throw error;
       }
 
-      budget.category =
-        normalizeCategory(
-          category
-        );
-    }
+      const { category, allocatedAmount, month, year, description } = req.body;
 
-    // --------------------------------------------------------
-    // ALLOCATED AMOUNT
-    // --------------------------------------------------------
+      // ----------------------------------------------------
+      // CATEGORY
+      // ----------------------------------------------------
 
-    if (
-      allocatedAmount !==
-      undefined
-    ) {
-      const amount =
-        parseNonNegativeWholeNumber(
-          allocatedAmount
-        );
+      if (category !== undefined) {
+        const normalizedCategory = normalizeCategory(category);
 
-      if (amount === null) {
-        return res.status(400).json({
-          success: false,
-          message:
+        if (!normalizedCategory) {
+          const error = new Error("Category cannot be empty");
+
+          error.statusCode = 400;
+
+          throw error;
+        }
+
+        budget.category = normalizedCategory;
+      }
+
+      // ----------------------------------------------------
+      // ALLOCATED AMOUNT
+      // ----------------------------------------------------
+
+      if (allocatedAmount !== undefined) {
+        const amount = parseNonNegativeWholeNumber(allocatedAmount);
+
+        if (amount === null) {
+          const error = new Error(
             "Allocated amount must be a valid non-negative whole number",
-        });
+          );
+
+          error.statusCode = 400;
+
+          throw error;
+        }
+
+        budget.allocatedAmount = amount;
       }
 
-      budget.allocatedAmount =
-        amount;
-    }
+      // ----------------------------------------------------
+      // MONTH
+      // ----------------------------------------------------
 
-    // --------------------------------------------------------
-    // MONTH
-    // --------------------------------------------------------
+      if (month !== undefined) {
+        const parsedMonth = parseMonth(month);
 
-    if (month !== undefined) {
-      const parsedMonth =
-        parseMonth(month);
+        if (parsedMonth === null) {
+          const error = new Error("Month must be an integer between 0 and 11");
 
-      if (parsedMonth === null) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Month must be an integer between 0 and 11",
-        });
+          error.statusCode = 400;
+
+          throw error;
+        }
+
+        budget.month = parsedMonth;
       }
 
-      budget.month =
-        parsedMonth;
-    }
+      // ----------------------------------------------------
+      // YEAR
+      // ----------------------------------------------------
 
-    // --------------------------------------------------------
-    // YEAR
-    // --------------------------------------------------------
+      if (year !== undefined) {
+        const parsedYear = parseYear(year);
 
-    if (year !== undefined) {
-      const parsedYear =
-        parseYear(year);
+        if (parsedYear === null) {
+          const error = new Error("Invalid year");
 
-      if (parsedYear === null) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Invalid year",
-        });
+          error.statusCode = 400;
+
+          throw error;
+        }
+
+        budget.year = parsedYear;
       }
 
-      budget.year =
-        parsedYear;
-    }
+      // ----------------------------------------------------
+      // DESCRIPTION
+      // ----------------------------------------------------
 
-    // --------------------------------------------------------
-    // DESCRIPTION
-    // --------------------------------------------------------
+      if (description !== undefined) {
+        budget.description = normalizeDescription(description);
+      }
 
-    if (
-      description !==
-      undefined
-    ) {
-      budget.description =
-        normalizeDescription(
-          description
+      // ----------------------------------------------------
+      // RE-CALCULATE SPENDING
+      //
+      // This makes the controller safe even if category,
+      // month or year is changed.
+      // ----------------------------------------------------
+
+      const startDate = new Date(budget.year, budget.month, 1, 0, 0, 0, 0);
+
+      const endDate = new Date(budget.year, budget.month + 1, 1, 0, 0, 0, 0);
+
+      const matchingExpenses = await Expense.find({
+        userId: budget.userId,
+
+        email: budget.email,
+
+        category: budget.category,
+
+        type: "expense",
+
+        date: {
+          $gte: startDate,
+          $lt: endDate,
+        },
+      }).session(session);
+
+      const spent = matchingExpenses.reduce(
+        (total, expense) => total + Number(expense.amount || 0),
+        0,
+      );
+
+      budget.spentAmount = spent;
+
+      // pre-save calculates:
+      // remainingAmount
+      // percentageUsed
+      // status
+
+      await budget.save({
+        session,
+      });
+
+      // ----------------------------------------------------
+      // LINK EXPENSES TO BUDGET
+      // ----------------------------------------------------
+
+      await Expense.updateMany(
+        {
+          userId: budget.userId,
+
+          email: budget.email,
+
+          category: budget.category,
+
+          type: "expense",
+
+          date: {
+            $gte: startDate,
+            $lt: endDate,
+          },
+        },
+        {
+          $set: {
+            budgetId: budget._id,
+
+            budgetAmountUsed: 0,
+          },
+        },
+        {
+          session,
+        },
+      );
+
+      // ----------------------------------------------------
+      // SET EACH EXPENSE'S USED AMOUNT
+      // ----------------------------------------------------
+
+      for (const expense of matchingExpenses) {
+        await Expense.updateOne(
+          {
+            _id: expense._id,
+          },
+          {
+            $set: {
+              budgetId: budget._id,
+
+              budgetAmountUsed: Number(expense.amount || 0),
+            },
+          },
+          {
+            session,
+          },
         );
-    }
+      }
+    });
 
-    // --------------------------------------------------------
-    // IMPORTANT
-    //
-    // NEVER DO:
-    //
-    // budget.spentAmount = 0
-    //
-    // The current spent amount must remain intact.
-    // --------------------------------------------------------
-
-    await budget.save();
-
-    // --------------------------------------------------------
+    // ========================================================
     // NOTIFICATION
-    // --------------------------------------------------------
+    // ========================================================
 
     let notification = null;
 
     try {
-      notification =
-        await createNotification({
-          userId:
-            budget.userId,
+      notification = await createNotification({
+        userId: budget.userId,
 
-          email:
-            budget.email,
+        email: budget.email,
 
-          title:
-            "📊 Budget Updated",
+        title: "📊 Budget Updated",
 
-          message:
-            `${budget.category} budget was updated.`,
+        message: `${budget.category} budget was updated.`,
 
-          type: "info",
+        type: "info",
 
-          referenceId:
-            budget._id,
+        referenceId: budget._id,
 
-          referenceModel:
-            "Budget",
-        });
+        referenceModel: "Budget",
+      });
     } catch (notificationError) {
-      console.error(
-        "⚠️ Budget update notification failed:",
-        notificationError
-      );
+      console.error("⚠️ Budget update notification failed:", notificationError);
     }
 
     return res.status(200).json({
       success: true,
 
-      message:
-        "Budget updated successfully",
+      message: "Budget updated successfully",
 
       data: budget,
+
+      budgetSummary: {
+        allocatedAmount: budget.allocatedAmount,
+
+        spentAmount: budget.spentAmount,
+
+        remainingAmount: budget.remainingAmount,
+
+        percentageUsed: budget.percentageUsed,
+
+        status: budget.status,
+      },
 
       notification,
     });
   } catch (error) {
-    console.error(
-      "❌ Update budget error:",
-      error
-    );
+    console.error("❌ Update budget error:", error);
 
-    // --------------------------------------------------------
-    // DUPLICATE
-    // --------------------------------------------------------
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
 
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-
         message:
           "A budget already exists for this category, month, year, and user.",
       });
     }
 
-    // --------------------------------------------------------
-    // VALIDATION
-    // --------------------------------------------------------
-
-    if (
-      error.name ===
-      "ValidationError"
-    ) {
-      return res.status(400).json({
-        success: false,
-
-        message:
-          "Budget validation failed",
-
-        errors:
-          Object.values(
-            error.errors
-          ).map(
-            (err) =>
-              err.message
-          ),
-      });
-    }
-
     return res.status(500).json({
       success: false,
-
-      message:
-        "Failed to update budget",
-
-      error:
-        error.message,
+      message: error.message || "Failed to update budget",
     });
+  } finally {
+    await session.endSession();
   }
 };
 
@@ -2246,22 +3403,16 @@ exports.updateBudget = async (
 // DELETE BUDGET
 //
 // IMPORTANT:
-//
-// Deleting a budget does NOT delete expenses.
-//
-// Expense records remain historical records.
+// Expenses are NOT deleted.
+// Their historical records remain.
+// Their budgetId is removed.
 // ============================================================
 
-exports.deleteBudget = async (
-  req,
-  res
-) => {
+exports.deleteBudget = async (req, res) => {
+  const session = await mongoose.startSession();
+
   try {
     const { id } = req.params;
-
-    // --------------------------------------------------------
-    // ID
-    // --------------------------------------------------------
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -2270,101 +3421,109 @@ exports.deleteBudget = async (
       });
     }
 
-    // --------------------------------------------------------
-    // FIND
-    // --------------------------------------------------------
+    let budget;
 
-    const budget =
-      await Budget.findById(id);
+    await session.withTransaction(async () => {
+      budget = await Budget.findById(id).session(session);
 
-    if (!budget) {
-      return res.status(404).json({
-        success: false,
-        message: "Budget not found",
+      if (!budget) {
+        const error = new Error("Budget not found");
+
+        error.statusCode = 404;
+
+        throw error;
+      }
+
+      // ----------------------------------------------------
+      // REMOVE BUDGET LINK FROM EXPENSES
+      // ----------------------------------------------------
+
+      await Expense.updateMany(
+        {
+          budgetId: budget._id,
+        },
+        {
+          $set: {
+            budgetId: null,
+            budgetAmountUsed: 0,
+          },
+        },
+        {
+          session,
+        },
+      );
+
+      // ----------------------------------------------------
+      // DELETE BUDGET
+      // ----------------------------------------------------
+
+      await budget.deleteOne({
+        session,
       });
-    }
+    });
 
-    // --------------------------------------------------------
-    // SAVE INFORMATION
-    // --------------------------------------------------------
-
-    const budgetId =
-      budget._id;
-
-    const budgetEmail =
-      budget.email;
-
-    const budgetUserId =
-      budget.userId;
-
-    const budgetCategory =
-      budget.category;
-
-    // --------------------------------------------------------
-    // DELETE
-    // --------------------------------------------------------
-
-    await budget.deleteOne();
-
-    // --------------------------------------------------------
+    // ========================================================
     // NOTIFICATION
-    // --------------------------------------------------------
+    // ========================================================
 
     let notification = null;
 
     try {
-      notification =
-        await createNotification({
-          userId:
-            budgetUserId,
+      notification = await createNotification({
+        userId: budget.userId,
 
-          email:
-            budgetEmail,
+        email: budget.email,
 
-          title:
-            "🗑️ Budget Deleted",
+        title: "🗑️ Budget Deleted",
 
-          message:
-            `${budgetCategory} budget was deleted.`,
+        message: `${budget.category} budget was deleted.`,
 
-          type: "warning",
+        type: "warning",
 
-          referenceId:
-            budgetId,
+        referenceId: budget._id,
 
-          referenceModel:
-            "Budget",
-        });
+        referenceModel: "Budget",
+      });
     } catch (notificationError) {
       console.error(
         "⚠️ Budget deletion notification failed:",
-        notificationError
+        notificationError,
       );
     }
 
     return res.status(200).json({
       success: true,
 
-      message:
-        "Budget deleted successfully",
+      message: "Budget deleted successfully",
 
       notification,
     });
   } catch (error) {
-    console.error(
-      "❌ Delete budget error:",
-      error
-    );
+    console.error("❌ Delete budget error:", error);
+
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
 
     return res.status(500).json({
       success: false,
 
-      message:
-        "Failed to delete budget",
+      message: "Failed to delete budget",
 
-      error:
-        error.message,
+      error: error.message,
     });
+  } finally {
+    await session.endSession();
   }
 };
 
+// ============================================================
+// EXPORT CONTROLLERS
+// ============================================================
+
+module.exports = {
+  ...module.exports,
+};
