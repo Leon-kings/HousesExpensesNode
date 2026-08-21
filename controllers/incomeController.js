@@ -2324,135 +2324,155 @@ exports.updateIncome = async (req, res) => {
 // @route DELETE /api/incomes/:id
 // ============================================================
 
+// exports.deleteIncome = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     // ========================================================
+//     // VALIDATE ID
+//     // ========================================================
+
+//     if (!isValidObjectId(id)) {
+//       return res.status(400).json({
+//         success: false,
+
+//         message: "Invalid income ID",
+//       });
+//     }
+
+//     // ========================================================
+//     // FIND INCOME
+//     // ========================================================
+
+//     const income = await Income.findById(id);
+
+//     if (!income) {
+//       return res.status(404).json({
+//         success: false,
+
+//         message: "Income not found",
+//       });
+//     }
+
+//     // ========================================================
+//     // CHECK USED MONEY
+//     // ========================================================
+
+//     const incomeAmount = Number(income.amount) || 0;
+
+//     const remainingAmount = Number(income.remainingAmount) || 0;
+
+//     const usedAmount = Math.max(incomeAmount - remainingAmount, 0);
+
+//     // --------------------------------------------------------
+//     // IMPORTANT
+//     //
+//     // If expenses have already consumed part of this income,
+//     // deleting the income would make the financial records
+//     // inconsistent.
+//     // --------------------------------------------------------
+
+//     if (usedAmount > 0) {
+//       return res.status(409).json({
+//         success: false,
+
+//         message:
+//           "This income cannot be deleted because part of it has already been used by expenses.",
+
+//         amountUsed: usedAmount,
+
+//         remainingAmount: remainingAmount,
+//       });
+//     }
+
+//     // ========================================================
+//     // SAVE INFORMATION
+//     // ========================================================
+
+//     const incomeId = income._id;
+
+//     const incomeEmail = income.email;
+
+//     const incomeUserId = income.userId;
+
+//     const incomeDescription = income.description;
+
+//     const incomeCategory = income.category;
+
+//     // ========================================================
+//     // DELETE
+//     // ========================================================
+
+//     await income.deleteOne();
+
+//     // ========================================================
+//     // NOTIFICATION
+//     // ========================================================
+
+//     let notification = null;
+
+//     try {
+//       notification = await createNotification({
+//         userId: incomeUserId,
+
+//         email: incomeEmail,
+
+//         title: "🗑️ Income Deleted",
+
+//         message:
+//           `${incomeCategory} income of RWF ` +
+//           `${incomeAmount.toLocaleString()} ` +
+//           `(${incomeDescription}) was deleted.`,
+
+//         type: "warning",
+
+//         referenceId: incomeId,
+
+//         referenceModel: "Income",
+//       });
+//     } catch (notificationError) {
+//       console.error("⚠️ Income delete notification error:", notificationError);
+//     }
+
+//     // ========================================================
+//     // RESPONSE
+//     // ========================================================
+
+//     return res.status(200).json({
+//       success: true,
+
+//       message: "Income deleted successfully",
+
+//       notification,
+//     });
+//   } catch (error) {
+//     console.error("❌ Delete income error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+
+//       message: "Failed to delete income",
+
+//       error: error.message,
+//     });
+//   }
+// };
 exports.deleteIncome = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // ========================================================
-    // VALIDATE ID
-    // ========================================================
-
-    if (!isValidObjectId(id)) {
-      return res.status(400).json({
-        success: false,
-
-        message: "Invalid income ID",
-      });
-    }
-
-    // ========================================================
-    // FIND INCOME
-    // ========================================================
-
-    const income = await Income.findById(id);
-
-    if (!income) {
-      return res.status(404).json({
-        success: false,
-
-        message: "Income not found",
-      });
-    }
-
-    // ========================================================
-    // CHECK USED MONEY
-    // ========================================================
-
-    const incomeAmount = Number(income.amount) || 0;
-
-    const remainingAmount = Number(income.remainingAmount) || 0;
-
-    const usedAmount = Math.max(incomeAmount - remainingAmount, 0);
-
-    // --------------------------------------------------------
-    // IMPORTANT
-    //
-    // If expenses have already consumed part of this income,
-    // deleting the income would make the financial records
-    // inconsistent.
-    // --------------------------------------------------------
-
-    if (usedAmount > 0) {
-      return res.status(409).json({
-        success: false,
-
-        message:
-          "This income cannot be deleted because part of it has already been used by expenses.",
-
-        amountUsed: usedAmount,
-
-        remainingAmount: remainingAmount,
-      });
-    }
-
-    // ========================================================
-    // SAVE INFORMATION
-    // ========================================================
-
-    const incomeId = income._id;
-
-    const incomeEmail = income.email;
-
-    const incomeUserId = income.userId;
-
-    const incomeDescription = income.description;
-
-    const incomeCategory = income.category;
-
-    // ========================================================
-    // DELETE
-    // ========================================================
-
-    await income.deleteOne();
-
-    // ========================================================
-    // NOTIFICATION
-    // ========================================================
-
-    let notification = null;
-
-    try {
-      notification = await createNotification({
-        userId: incomeUserId,
-
-        email: incomeEmail,
-
-        title: "🗑️ Income Deleted",
-
-        message:
-          `${incomeCategory} income of RWF ` +
-          `${incomeAmount.toLocaleString()} ` +
-          `(${incomeDescription}) was deleted.`,
-
-        type: "warning",
-
-        referenceId: incomeId,
-
-        referenceModel: "Income",
-      });
-    } catch (notificationError) {
-      console.error("⚠️ Income delete notification error:", notificationError);
-    }
-
-    // ========================================================
-    // RESPONSE
-    // ========================================================
+    await Income.findByIdAndDelete(id);
 
     return res.status(200).json({
       success: true,
-
       message: "Income deleted successfully",
-
-      notification,
     });
   } catch (error) {
     console.error("❌ Delete income error:", error);
 
     return res.status(500).json({
       success: false,
-
       message: "Failed to delete income",
-
       error: error.message,
     });
   }
