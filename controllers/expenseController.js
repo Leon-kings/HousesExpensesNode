@@ -4134,9 +4134,14 @@ const reverseBudgetAmount = async ({
 // CREATE EXPENSE
 // ============================================================
 
+
+// ============================================================
+// CREATE EXPENSE
+// ============================================================
+
 // exports.createExpense = async (
 //   req,
-//   res,
+//   res
 // ) => {
 //   const session =
 //     await mongoose.startSession();
@@ -4153,9 +4158,9 @@ const reverseBudgetAmount = async ({
 //       userId,
 //     } = req.body;
 
-//     // ======================================================
+//     // ========================================================
 //     // VALIDATION
-//     // ======================================================
+//     // ========================================================
 
 //     if (
 //       !description ||
@@ -4173,21 +4178,32 @@ const reverseBudgetAmount = async ({
 //       });
 //     }
 
+//     // ========================================================
+//     // USER ID
+//     // ========================================================
+
 //     if (
 //       !isValidObjectId(userId)
 //     ) {
 //       return res.status(400).json({
 //         success: false,
-//         message: "Invalid userId",
+//         message:
+//           "Invalid userId",
 //       });
 //     }
 
+//     // ========================================================
+//     // AMOUNT
+//     // ========================================================
+
 //     const numericAmount =
 //       parsePositiveWholeNumber(
-//         amount,
+//         amount
 //       );
 
-//     if (numericAmount === null) {
+//     if (
+//       numericAmount === null
+//     ) {
 //       return res.status(400).json({
 //         success: false,
 //         message:
@@ -4195,12 +4211,16 @@ const reverseBudgetAmount = async ({
 //       });
 //     }
 
+//     // ========================================================
+//     // DATE
+//     // ========================================================
+
 //     const expenseDate =
 //       new Date(date);
 
 //     if (
 //       Number.isNaN(
-//         expenseDate.getTime(),
+//         expenseDate.getTime()
 //       )
 //     ) {
 //       return res.status(400).json({
@@ -4210,10 +4230,16 @@ const reverseBudgetAmount = async ({
 //       });
 //     }
 
+//     // ========================================================
+//     // EMAIL
+//     // ========================================================
+
 //     const normalizedEmail =
 //       normalizeEmail(email);
 
-//     if (!normalizedEmail) {
+//     if (
+//       !normalizedEmail
+//     ) {
 //       return res.status(400).json({
 //         success: false,
 //         message:
@@ -4221,12 +4247,18 @@ const reverseBudgetAmount = async ({
 //       });
 //     }
 
+//     // ========================================================
+//     // CATEGORY
+//     // ========================================================
+
 //     const normalizedCategory =
-//       normalizeCategory(category);
+//       normalizeCategory(
+//         category
+//       );
 
 //     if (
 //       !isValidExpenseCategory(
-//         normalizedCategory,
+//         normalizedCategory
 //       )
 //     ) {
 //       return res.status(400).json({
@@ -4236,11 +4268,18 @@ const reverseBudgetAmount = async ({
 //       });
 //     }
 
+//     // ========================================================
+//     // TYPE
+//     // ========================================================
+
 //     const expenseType =
-//       normalizeExpenseType(type);
+//       normalizeExpenseType(
+//         type
+//       );
 
 //     if (
-//       expenseType !== "expense"
+//       expenseType !==
+//       "expense"
 //     ) {
 //       return res.status(400).json({
 //         success: false,
@@ -4249,17 +4288,18 @@ const reverseBudgetAmount = async ({
 //       });
 //     }
 
-//     // ======================================================
+//     // ========================================================
 //     // TRANSACTION
-//     // ======================================================
+//     // ========================================================
 
-//     let expense;
+//     let expense = null;
+//     let matchedBudget = null;
 
 //     await session.withTransaction(
 //       async () => {
-//         // --------------------------------------------------
-//         // ALLOCATE MONEY
-//         // --------------------------------------------------
+//         // ====================================================
+//         // 1. ALLOCATE MONEY
+//         // ====================================================
 
 //         const allocation =
 //           await allocateMoney({
@@ -4274,31 +4314,59 @@ const reverseBudgetAmount = async ({
 //             session,
 //           });
 
-//         // --------------------------------------------------
-//         // FIND BUDGET
-//         // --------------------------------------------------
+//         // ====================================================
+//         // 2. GET EXPENSE MONTH/YEAR
+//         // ====================================================
 
-//         const budget =
-//           await findBudgetForExpense({
+//         const expenseMonth =
+//           expenseDate.getMonth();
+
+//         const expenseYear =
+//           expenseDate.getFullYear();
+
+//         // ====================================================
+//         // 3. FIND MATCHING BUDGET
+//         //
+//         // VERY IMPORTANT:
+//         //
+//         // We use:
+//         // userId
+//         // category
+//         // month
+//         // year
+//         //
+//         // Therefore an August expense cannot update
+//         // a July budget.
+//         // ====================================================
+
+//         matchedBudget =
+//           await Budget.findOne({
 //             userId,
 
 //             category:
 //               normalizedCategory,
 
-//             date:
-//               expenseDate,
+//             month:
+//               expenseMonth,
 
-//             session,
-//           });
+//             year:
+//               expenseYear,
+//           }).session(
+//             session
+//           );
+
+//         // ====================================================
+//         // 4. BUDGET AMOUNT
+//         // ====================================================
 
 //         const budgetAmountUsed =
-//           budget
+//           matchedBudget
 //             ? numericAmount
 //             : 0;
 
-//         // --------------------------------------------------
-//         // CREATE EXPENSE
-//         // --------------------------------------------------
+//         // ====================================================
+//         // 5. CREATE EXPENSE
+//         // ====================================================
 
 //         const createdExpenses =
 //           await Expense.create(
@@ -4306,13 +4374,14 @@ const reverseBudgetAmount = async ({
 //               {
 //                 description:
 //                   String(
-//                     description,
+//                     description
 //                   ).trim(),
 
 //                 category:
 //                   normalizedCategory,
 
-//                 type: "expense",
+//                 type:
+//                   "expense",
 
 //                 amount:
 //                   numericAmount,
@@ -4321,7 +4390,9 @@ const reverseBudgetAmount = async ({
 //                   expenseDate,
 
 //                 user:
-//                   String(user).trim(),
+//                   String(
+//                     user
+//                   ).trim(),
 
 //                 userId,
 
@@ -4341,94 +4412,166 @@ const reverseBudgetAmount = async ({
 //                   allocation.savingsAllocations,
 
 //                 budgetId:
-//                   budget
-//                     ? budget._id
+//                   matchedBudget
+//                     ? matchedBudget._id
 //                     : null,
 
-//                 budgetAmountUsed,
+//                 budgetAmountUsed:
+//                   budgetAmountUsed,
 //               },
 //             ],
 //             {
 //               session,
-//             },
+//             }
 //           );
 
 //         expense =
 //           createdExpenses[0];
 
-//         // --------------------------------------------------
-//         // UPDATE BUDGET
-//         // --------------------------------------------------
+//         // ====================================================
+//         // 6. UPDATE BUDGET
+//         // ====================================================
 
-//         if (budget) {
-//           await applyBudgetAmount({
-//             budget,
+//         if (
+//           matchedBudget
+//         ) {
+//           // Add expense to budget
+//           matchedBudget.addExpense(
+//             numericAmount
+//           );
+
+//           // Save updated budget
+//           await matchedBudget.save({
+//             session,
+//           });
+
+//           console.log(
+//             "✅ BUDGET UPDATED"
+//           );
+
+//           console.log({
+//             budgetId:
+//               matchedBudget._id,
+
+//             category:
+//               matchedBudget.category,
+
+//             allocated:
+//               matchedBudget.allocatedAmount,
+
+//             spent:
+//               matchedBudget.spentAmount,
+
+//             remaining:
+//               matchedBudget.remainingAmount,
+
+//             percentage:
+//               matchedBudget.percentageUsed,
+
+//             status:
+//               matchedBudget.status,
+//           });
+//         } else {
+//           console.log(
+//             "ℹ️ No matching budget found"
+//           );
+
+//           console.log({
+//             userId,
+//             category:
+//               normalizedCategory,
+//             month:
+//               expenseMonth,
+//             year:
+//               expenseYear,
+//           });
+//         }
+//       }
+//     );
+
+//     // ========================================================
+//     // NOTIFICATION
+//     // ========================================================
+
+//     let notification = null;
+
+//     try {
+//       notification =
+//         await createNotificationSafely({
+//           userEmail:
+//             normalizedEmail,
+
+//           userId,
+
+//           title:
+//             "💸 Expense Added",
+
+//           message:
+//             `Expense of RWF ` +
+//             `${numericAmount.toLocaleString()} ` +
+//             `for ${normalizedCategory} ` +
+//             `was added.`,
+
+//           type:
+//             "expense",
+
+//           severity:
+//             "medium",
+
+//           relatedId:
+//             expense._id,
+
+//           relatedType:
+//             "expense",
+
+//           actionLink:
+//             `/expenses/${expense._id}`,
+
+//           metadata: {
+//             expenseId:
+//               expense._id,
 
 //             amount:
 //               numericAmount,
 
-//             session,
-//           });
-//         }
-//       },
-//     );
+//             category:
+//               normalizedCategory,
 
-//     // ======================================================
-//     // NOTIFICATION
-//     // ======================================================
+//             incomeUsed:
+//               expense.incomeUsed,
 
-//     const notification =
-//       await createNotificationSafely({
-//         userEmail:
-//           normalizedEmail,
+//             savingsUsed:
+//               expense.savingsUsed,
 
-//         userId,
+//             budgetAmountUsed:
+//               expense.budgetAmountUsed,
 
-//         title:
-//           "💸 Expense Added",
+//             budgetId:
+//               expense.budgetId,
 
-//         message:
-//           `Expense of RWF ` +
-//           `${numericAmount.toLocaleString()} ` +
-//           `for ${normalizedCategory} ` +
-//           `was added.`,
+//             budgetSpent:
+//               matchedBudget
+//                 ? matchedBudget.spentAmount
+//                 : 0,
 
-//         type: "expense",
+//             budgetRemaining:
+//               matchedBudget
+//                 ? matchedBudget.remainingAmount
+//                 : 0,
+//           },
+//         });
+//     } catch (
+//       notificationError
+//     ) {
+//       console.error(
+//         "⚠️ Expense notification failed:",
+//         notificationError
+//       );
+//     }
 
-//         severity: "medium",
-
-//         relatedId:
-//           expense._id,
-
-//         relatedType:
-//           "expense",
-
-//         actionLink:
-//           `/expenses/${expense._id}`,
-
-//         metadata: {
-//           expenseId:
-//             expense._id,
-
-//           amount:
-//             numericAmount,
-
-//           category:
-//             normalizedCategory,
-
-//           incomeUsed:
-//             expense.incomeUsed,
-
-//           savingsUsed:
-//             expense.savingsUsed,
-
-//           budgetAmountUsed:
-//             expense.budgetAmountUsed,
-
-//           budgetId:
-//             expense.budgetId,
-//         },
-//       });
+//     // ========================================================
+//     // RESPONSE
+//     // ========================================================
 
 //     return res.status(201).json({
 //       success: true,
@@ -4438,15 +4581,42 @@ const reverseBudgetAmount = async ({
 
 //       data: expense,
 
+//       budget: matchedBudget
+//         ? {
+//             _id:
+//               matchedBudget._id,
+
+//             category:
+//               matchedBudget.category,
+
+//             allocatedAmount:
+//               matchedBudget.allocatedAmount,
+
+//             spentAmount:
+//               matchedBudget.spentAmount,
+
+//             remainingAmount:
+//               matchedBudget.remainingAmount,
+
+//             percentageUsed:
+//               matchedBudget.percentageUsed,
+
+//             status:
+//               matchedBudget.status,
+//           }
+//         : null,
+
 //       notification,
 //     });
 //   } catch (error) {
 //     console.error(
 //       "❌ Create expense error:",
-//       error,
+//       error
 //     );
 
-//     return res.status(400).json({
+//     return res.status(
+//       error.statusCode || 400
+//     ).json({
 //       success: false,
 
 //       message:
@@ -4458,16 +4628,13 @@ const reverseBudgetAmount = async ({
 //   }
 // };
 
+
 // ============================================================
 // CREATE EXPENSE
 // ============================================================
 
-exports.createExpense = async (
-  req,
-  res
-) => {
-  const session =
-    await mongoose.startSession();
+exports.createExpense = async (req, res) => {
+  const session = await mongoose.startSession();
 
   try {
     const {
@@ -4479,6 +4646,19 @@ exports.createExpense = async (
       user,
       email,
       userId,
+
+      // ======================================================
+      // BUDGET CONFIRMATION
+      //
+      // false / undefined:
+      // Do not allow an expense that exceeds the budget yet.
+      //
+      // true:
+      // User has confirmed that they want to continue even
+      // though the expense exceeds the budget.
+      // ======================================================
+
+      confirmBudgetExceeded,
     } = req.body;
 
     // ========================================================
@@ -4496,8 +4676,7 @@ exports.createExpense = async (
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "All expense fields are required",
+        message: "All expense fields are required",
       });
     }
 
@@ -4505,13 +4684,10 @@ exports.createExpense = async (
     // USER ID
     // ========================================================
 
-    if (
-      !isValidObjectId(userId)
-    ) {
+    if (!isValidObjectId(userId)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid userId",
+        message: "Invalid userId",
       });
     }
 
@@ -4519,18 +4695,12 @@ exports.createExpense = async (
     // AMOUNT
     // ========================================================
 
-    const numericAmount =
-      parsePositiveWholeNumber(
-        amount
-      );
+    const numericAmount = parsePositiveWholeNumber(amount);
 
-    if (
-      numericAmount === null
-    ) {
+    if (numericAmount === null) {
       return res.status(400).json({
         success: false,
-        message:
-          "Amount must be a positive whole number",
+        message: "Amount must be a positive whole number",
       });
     }
 
@@ -4538,18 +4708,12 @@ exports.createExpense = async (
     // DATE
     // ========================================================
 
-    const expenseDate =
-      new Date(date);
+    const expenseDate = new Date(date);
 
-    if (
-      Number.isNaN(
-        expenseDate.getTime()
-      )
-    ) {
+    if (Number.isNaN(expenseDate.getTime())) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid expense date",
+        message: "Invalid expense date",
       });
     }
 
@@ -4557,16 +4721,12 @@ exports.createExpense = async (
     // EMAIL
     // ========================================================
 
-    const normalizedEmail =
-      normalizeEmail(email);
+    const normalizedEmail = normalizeEmail(email);
 
-    if (
-      !normalizedEmail
-    ) {
+    if (!normalizedEmail) {
       return res.status(400).json({
         success: false,
-        message:
-          "Valid email is required",
+        message: "Valid email is required",
       });
     }
 
@@ -4574,20 +4734,12 @@ exports.createExpense = async (
     // CATEGORY
     // ========================================================
 
-    const normalizedCategory =
-      normalizeCategory(
-        category
-      );
+    const normalizedCategory = normalizeCategory(category);
 
-    if (
-      !isValidExpenseCategory(
-        normalizedCategory
-      )
-    ) {
+    if (!isValidExpenseCategory(normalizedCategory)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid expense category",
+        message: "Invalid expense category",
       });
     }
 
@@ -4595,15 +4747,9 @@ exports.createExpense = async (
     // TYPE
     // ========================================================
 
-    const expenseType =
-      normalizeExpenseType(
-        type
-      );
+    const expenseType = normalizeExpenseType(type);
 
-    if (
-      expenseType !==
-      "expense"
-    ) {
+    if (expenseType !== "expense") {
       return res.status(400).json({
         success: false,
         message:
@@ -4612,211 +4758,277 @@ exports.createExpense = async (
     }
 
     // ========================================================
-    // TRANSACTION
+    // CONFIRMATION VALUE
+    // ========================================================
+
+    const budgetExceededConfirmed =
+      confirmBudgetExceeded === true ||
+      confirmBudgetExceeded === "true";
+
+    // ========================================================
+    // EXPENSE MONTH / YEAR
+    // ========================================================
+
+    const expenseMonth = expenseDate.getMonth();
+    const expenseYear = expenseDate.getFullYear();
+
+    // ========================================================
+    // VARIABLES
     // ========================================================
 
     let expense = null;
     let matchedBudget = null;
+    let budgetCheck = null;
+    let notification = null;
 
-    await session.withTransaction(
-      async () => {
-        // ====================================================
-        // 1. ALLOCATE MONEY
-        // ====================================================
+    // ========================================================
+    // TRANSACTION
+    // ========================================================
 
-        const allocation =
-          await allocateMoney({
-            amount:
-              numericAmount,
+    await session.withTransaction(async () => {
+      // ======================================================
+      // 1. FIND MATCHING BUDGET
+      //
+      // IMPORTANT:
+      //
+      // Budget is matched using:
+      //
+      // userId
+      // category
+      // month
+      // year
+      //
+      // This means:
+      //
+      // August Food expense
+      // ONLY updates August Food budget.
+      //
+      // It will NOT update July Food budget.
+      // ======================================================
 
-            userId,
+      matchedBudget = await Budget.findOne({
+        userId,
+        category: normalizedCategory,
+        month: expenseMonth,
+        year: expenseYear,
+      }).session(session);
 
-            email:
-              normalizedEmail,
+      // ======================================================
+      // 2. CHECK BUDGET BEFORE USING INCOME
+      //
+      // VERY IMPORTANT:
+      //
+      // If the budget is exceeded and the user has NOT
+      // confirmed, we stop here.
+      //
+      // Therefore:
+      //
+      // Income is NOT touched.
+      // Expense is NOT created.
+      // Budget is NOT updated.
+      // ======================================================
 
-            session,
-          });
-
-        // ====================================================
-        // 2. GET EXPENSE MONTH/YEAR
-        // ====================================================
-
-        const expenseMonth =
-          expenseDate.getMonth();
-
-        const expenseYear =
-          expenseDate.getFullYear();
-
-        // ====================================================
-        // 3. FIND MATCHING BUDGET
-        //
-        // VERY IMPORTANT:
-        //
-        // We use:
-        // userId
-        // category
-        // month
-        // year
-        //
-        // Therefore an August expense cannot update
-        // a July budget.
-        // ====================================================
-
-        matchedBudget =
-          await Budget.findOne({
-            userId,
-
-            category:
-              normalizedCategory,
-
-            month:
-              expenseMonth,
-
-            year:
-              expenseYear,
-          }).session(
-            session
-          );
-
-        // ====================================================
-        // 4. BUDGET AMOUNT
-        // ====================================================
-
-        const budgetAmountUsed =
-          matchedBudget
-            ? numericAmount
-            : 0;
-
-        // ====================================================
-        // 5. CREATE EXPENSE
-        // ====================================================
-
-        const createdExpenses =
-          await Expense.create(
-            [
-              {
-                description:
-                  String(
-                    description
-                  ).trim(),
-
-                category:
-                  normalizedCategory,
-
-                type:
-                  "expense",
-
-                amount:
-                  numericAmount,
-
-                date:
-                  expenseDate,
-
-                user:
-                  String(
-                    user
-                  ).trim(),
-
-                userId,
-
-                email:
-                  normalizedEmail,
-
-                incomeUsed:
-                  allocation.incomeUsed,
-
-                savingsUsed:
-                  allocation.savingsUsed,
-
-                incomeAllocations:
-                  allocation.incomeAllocations,
-
-                savingsAllocations:
-                  allocation.savingsAllocations,
-
-                budgetId:
-                  matchedBudget
-                    ? matchedBudget._id
-                    : null,
-
-                budgetAmountUsed:
-                  budgetAmountUsed,
-              },
-            ],
-            {
-              session,
-            }
-          );
-
-        expense =
-          createdExpenses[0];
-
-        // ====================================================
-        // 6. UPDATE BUDGET
-        // ====================================================
+      if (matchedBudget) {
+        budgetCheck = matchedBudget.checkExpense(
+          numericAmount
+        );
 
         if (
-          matchedBudget
+          budgetCheck.exceeds &&
+          !budgetExceededConfirmed
         ) {
-          // Add expense to budget
-          matchedBudget.addExpense(
-            numericAmount
+          const error = new Error(
+            "Expense exceeds the remaining budget. Confirmation is required."
           );
 
-          // Save updated budget
-          await matchedBudget.save({
-            session,
-          });
+          error.statusCode = 409;
+          error.code = "BUDGET_EXCEEDED";
+          error.budgetCheck = budgetCheck;
 
-          console.log(
-            "✅ BUDGET UPDATED"
-          );
-
-          console.log({
-            budgetId:
-              matchedBudget._id,
-
-            category:
-              matchedBudget.category,
-
-            allocated:
-              matchedBudget.allocatedAmount,
-
-            spent:
-              matchedBudget.spentAmount,
-
-            remaining:
-              matchedBudget.remainingAmount,
-
-            percentage:
-              matchedBudget.percentageUsed,
-
-            status:
-              matchedBudget.status,
-          });
-        } else {
-          console.log(
-            "ℹ️ No matching budget found"
-          );
-
-          console.log({
-            userId,
-            category:
-              normalizedCategory,
-            month:
-              expenseMonth,
-            year:
-              expenseYear,
-          });
+          throw error;
         }
       }
-    );
+
+      // ======================================================
+      // 3. ALLOCATE MONEY FROM INCOME ONLY
+      //
+      // NEVER USE SAVINGS.
+      //
+      // The budget does not provide money.
+      //
+      // Income is the ONLY funding source.
+      // ======================================================
+
+      const allocation =
+        await allocateIncomeOnly({
+          amount: numericAmount,
+          userId,
+          email: normalizedEmail,
+          session,
+        });
+
+      // ======================================================
+      // 4. BUDGET AMOUNT
+      //
+      // If a matching budget exists, the FULL expense amount
+      // is tracked against that budget.
+      //
+      // This does NOT mean money came from the budget.
+      //
+      // Money came from Income.
+      // ======================================================
+
+      const budgetAmountUsed = matchedBudget
+        ? numericAmount
+        : 0;
+
+      // ======================================================
+      // 5. CREATE EXPENSE
+      // ======================================================
+
+      const createdExpenses = await Expense.create(
+        [
+          {
+            description: String(description).trim(),
+
+            category: normalizedCategory,
+
+            type: "expense",
+
+            amount: numericAmount,
+
+            date: expenseDate,
+
+            user: String(user).trim(),
+
+            userId,
+
+            email: normalizedEmail,
+
+            // =================================================
+            // INCOME IS THE ONLY FUNDING SOURCE
+            // =================================================
+
+            incomeUsed: allocation.incomeUsed,
+
+            incomeAllocations:
+              allocation.incomeAllocations,
+
+            // =================================================
+            // SAVINGS ARE NEVER USED
+            // =================================================
+
+            savingsUsed: 0,
+
+            savingsAllocations: [],
+
+            // =================================================
+            // BUDGET TRACKING
+            // =================================================
+
+            budgetId: matchedBudget
+              ? matchedBudget._id
+              : null,
+
+            budgetAmountUsed,
+          },
+        ],
+        {
+          session,
+        }
+      );
+
+      expense = createdExpenses[0];
+
+      // ======================================================
+      // 6. UPDATE BUDGET
+      //
+      // IMPORTANT:
+      //
+      // The budget can become negative.
+      //
+      // Example:
+      //
+      // allocated = 50,000
+      // spent     = 40,000
+      // expense   = 30,000
+      //
+      // new spent     = 70,000
+      // new remaining = -20,000
+      //
+      // This is intentional.
+      // ======================================================
+
+      if (matchedBudget) {
+        matchedBudget.addExpense(numericAmount);
+
+        await matchedBudget.save({
+          session,
+        });
+
+        console.log(
+          "✅ BUDGET UPDATED AFTER EXPENSE"
+        );
+
+        console.log({
+          budgetId: matchedBudget._id,
+
+          category: matchedBudget.category,
+
+          allocated:
+            matchedBudget.allocatedAmount,
+
+          spent:
+            matchedBudget.spentAmount,
+
+          remaining:
+            matchedBudget.remainingAmount,
+
+          percentage:
+            matchedBudget.percentageUsed,
+
+          status:
+            matchedBudget.status,
+
+          expenseAmount:
+            numericAmount,
+
+          exceeded:
+            budgetCheck
+              ? budgetCheck.exceeds
+              : false,
+
+          exceededBy:
+            budgetCheck
+              ? budgetCheck.exceededBy
+              : 0,
+        });
+      } else {
+        console.log(
+          "ℹ️ NO MATCHING BUDGET - EXPENSE CONTINUES USING INCOME"
+        );
+
+        console.log({
+          userId,
+
+          category:
+            normalizedCategory,
+
+          month:
+            expenseMonth,
+
+          year:
+            expenseYear,
+
+          amount:
+            numericAmount,
+        });
+      }
+    });
 
     // ========================================================
     // NOTIFICATION
     // ========================================================
-
-    let notification = null;
 
     try {
       notification =
@@ -4839,7 +5051,11 @@ exports.createExpense = async (
             "expense",
 
           severity:
-            "medium",
+            matchedBudget &&
+            budgetCheck &&
+            budgetCheck.exceeds
+              ? "high"
+              : "medium",
 
           relatedId:
             expense._id,
@@ -4860,17 +5076,36 @@ exports.createExpense = async (
             category:
               normalizedCategory,
 
+            // =================================================
+            // FUNDING
+            // =================================================
+
             incomeUsed:
               expense.incomeUsed,
 
+            incomeAllocations:
+              expense.incomeAllocations,
+
             savingsUsed:
-              expense.savingsUsed,
+              0,
+
+            savingsAllocations:
+              [],
+
+            // =================================================
+            // BUDGET
+            // =================================================
+
+            budgetId:
+              expense.budgetId,
 
             budgetAmountUsed:
               expense.budgetAmountUsed,
 
-            budgetId:
-              expense.budgetId,
+            budgetAllocated:
+              matchedBudget
+                ? matchedBudget.allocatedAmount
+                : 0,
 
             budgetSpent:
               matchedBudget
@@ -4881,11 +5116,34 @@ exports.createExpense = async (
               matchedBudget
                 ? matchedBudget.remainingAmount
                 : 0,
+
+            budgetPercentage:
+              matchedBudget
+                ? matchedBudget.percentageUsed
+                : 0,
+
+            budgetStatus:
+              matchedBudget
+                ? matchedBudget.status
+                : null,
+
+            budgetExceeded:
+              matchedBudget &&
+              budgetCheck
+                ? budgetCheck.exceeds
+                : false,
+
+            budgetExceededBy:
+              matchedBudget &&
+              budgetCheck
+                ? budgetCheck.exceededBy
+                : 0,
+
+            budgetExceededConfirmed:
+              budgetExceededConfirmed,
           },
         });
-    } catch (
-      notificationError
-    ) {
+    } catch (notificationError) {
       console.error(
         "⚠️ Expense notification failed:",
         notificationError
@@ -4900,9 +5158,17 @@ exports.createExpense = async (
       success: true,
 
       message:
-        "Expense created successfully",
+        matchedBudget &&
+        budgetCheck &&
+        budgetCheck.exceeds
+          ? "Expense created successfully. Budget was exceeded."
+          : "Expense created successfully",
 
       data: expense,
+
+      // ======================================================
+      // BUDGET RESULT
+      // ======================================================
 
       budget: matchedBudget
         ? {
@@ -4911,6 +5177,12 @@ exports.createExpense = async (
 
             category:
               matchedBudget.category,
+
+            month:
+              matchedBudget.month,
+
+            year:
+              matchedBudget.year,
 
             allocatedAmount:
               matchedBudget.allocatedAmount,
@@ -4926,12 +5198,90 @@ exports.createExpense = async (
 
             status:
               matchedBudget.status,
+
+            exceeded:
+              budgetCheck
+                ? budgetCheck.exceeds
+                : false,
+
+            exceededBy:
+              budgetCheck
+                ? budgetCheck.exceededBy
+                : 0,
+
+            confirmed:
+              budgetExceededConfirmed,
           }
         : null,
+
+      // ======================================================
+      // FUNDING RESULT
+      // ======================================================
+
+      funding: {
+        source: "income",
+
+        incomeUsed:
+          expense.incomeUsed,
+
+        incomeAllocations:
+          expense.incomeAllocations,
+
+        savingsUsed: 0,
+
+        savingsAllocations: [],
+      },
 
       notification,
     });
   } catch (error) {
+    // ========================================================
+    // BUDGET EXCEEDED
+    //
+    // This is the response the frontend uses to display:
+    //
+    // "This expense exceeds your budget by RWF X.
+    //  Do you want to continue?"
+    // ========================================================
+
+    if (
+      error.code ===
+      "BUDGET_EXCEEDED"
+    ) {
+      return res.status(409).json({
+        success: false,
+
+        code:
+          "BUDGET_EXCEEDED",
+
+        message:
+          "This expense exceeds the remaining budget. Do you want to proceed?",
+
+        requiresConfirmation:
+          true,
+
+        budget: error.budgetCheck,
+
+        // ====================================================
+        // IMPORTANT:
+        //
+        // Nothing has been created.
+        // Income has NOT been deducted.
+        // Budget has NOT been changed.
+        // ====================================================
+
+        expenseCreated: false,
+
+        incomeDeducted: false,
+
+        budgetUpdated: false,
+      });
+    }
+
+    // ========================================================
+    // NORMAL ERROR
+    // ========================================================
+
     console.error(
       "❌ Create expense error:",
       error

@@ -1,4 +1,3 @@
-
 // ============================================================
 // MODELS / INCOME.JS
 // ============================================================
@@ -19,10 +18,7 @@ const IncomeSchema = new mongoose.Schema(
       type: String,
       required: [true, "Description is required"],
       trim: true,
-      maxlength: [
-        200,
-        "Description cannot exceed 200 characters",
-      ],
+      maxlength: [200, "Description cannot exceed 200 characters"],
     },
 
     // ========================================================
@@ -33,10 +29,7 @@ const IncomeSchema = new mongoose.Schema(
       type: String,
       required: [true, "Category is required"],
       trim: true,
-      maxlength: [
-        100,
-        "Category cannot exceed 100 characters",
-      ],
+      maxlength: [100, "Category cannot exceed 100 characters"],
     },
 
     // ========================================================
@@ -46,10 +39,7 @@ const IncomeSchema = new mongoose.Schema(
     source: {
       type: String,
       trim: true,
-      maxlength: [
-        100,
-        "Source cannot exceed 100 characters",
-      ],
+      maxlength: [100, "Source cannot exceed 100 characters"],
       default: "",
     },
 
@@ -75,11 +65,8 @@ const IncomeSchema = new mongoose.Schema(
       min: [0, "Amount cannot be negative"],
       validate: {
         validator: (value) =>
-          Number.isFinite(value) &&
-          Number.isInteger(value) &&
-          value >= 0,
-        message:
-          "Amount must be a valid whole number",
+          Number.isFinite(value) && Number.isInteger(value) && value >= 0,
+        message: "Amount must be a valid whole number",
       },
     },
 
@@ -92,17 +79,11 @@ const IncomeSchema = new mongoose.Schema(
     remainingAmount: {
       type: Number,
       default: 0,
-      min: [
-        0,
-        "Remaining amount cannot be negative",
-      ],
+      min: [0, "Remaining amount cannot be negative"],
       validate: {
         validator: (value) =>
-          Number.isFinite(value) &&
-          Number.isInteger(value) &&
-          value >= 0,
-        message:
-          "Remaining amount must be a valid whole number",
+          Number.isFinite(value) && Number.isInteger(value) && value >= 0,
+        message: "Remaining amount must be a valid whole number",
       },
     },
 
@@ -124,10 +105,7 @@ const IncomeSchema = new mongoose.Schema(
       type: String,
       required: [true, "User is required"],
       trim: true,
-      maxlength: [
-        100,
-        "User cannot exceed 100 characters",
-      ],
+      maxlength: [100, "User cannot exceed 100 characters"],
     },
 
     // ========================================================
@@ -169,13 +147,7 @@ const IncomeSchema = new mongoose.Schema(
     frequency: {
       type: String,
       enum: {
-        values: [
-          "weekly",
-          "biweekly",
-          "monthly",
-          "quarterly",
-          "annually",
-        ],
+        values: ["weekly", "biweekly", "monthly", "quarterly", "annually"],
         message: "Invalid income frequency",
       },
       default: "monthly",
@@ -183,7 +155,7 @@ const IncomeSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // ============================================================
@@ -209,41 +181,32 @@ IncomeSchema.pre("save", function () {
   // NORMALIZE CATEGORY
   // ----------------------------------------------------------
 
-  this.category = String(
-    this.category || ""
-  ).trim();
+  this.category = String(this.category || "").trim();
 
   // ----------------------------------------------------------
   // NORMALIZE DESCRIPTION
   // ----------------------------------------------------------
 
-  this.description = String(
-    this.description || ""
-  ).trim();
+  this.description = String(this.description || "").trim();
 
   // ----------------------------------------------------------
   // NORMALIZE SOURCE
   // ----------------------------------------------------------
 
-  this.source = String(
-    this.source || ""
-  ).trim();
+  this.source = String(this.source || "").trim();
 
   // ----------------------------------------------------------
   // VALIDATE ORIGINAL AMOUNT
   // ----------------------------------------------------------
 
-  const numericAmount =
-    Number(this.amount);
+  const numericAmount = Number(this.amount);
 
   if (
     !Number.isFinite(numericAmount) ||
     !Number.isInteger(numericAmount) ||
     numericAmount < 0
   ) {
-    throw new Error(
-      "Amount must be a valid whole number"
-    );
+    throw new Error("Amount must be a valid whole number");
   }
 
   this.amount = numericAmount;
@@ -255,8 +218,7 @@ IncomeSchema.pre("save", function () {
   // ----------------------------------------------------------
 
   if (this.isNew) {
-    this.remainingAmount =
-      numericAmount;
+    this.remainingAmount = numericAmount;
 
     return;
   }
@@ -265,8 +227,7 @@ IncomeSchema.pre("save", function () {
   // EXISTING INCOME
   // ----------------------------------------------------------
 
-  const numericRemaining =
-    Number(this.remainingAmount);
+  const numericRemaining = Number(this.remainingAmount);
 
   if (
     !Number.isFinite(numericRemaining) ||
@@ -274,29 +235,22 @@ IncomeSchema.pre("save", function () {
   ) {
     this.remainingAmount = 0;
   } else {
-    this.remainingAmount =
-      numericRemaining;
+    this.remainingAmount = numericRemaining;
   }
 
   // ----------------------------------------------------------
   // NEVER EXCEED ORIGINAL INCOME
   // ----------------------------------------------------------
 
-  if (
-    this.remainingAmount >
-    this.amount
-  ) {
-    this.remainingAmount =
-      this.amount;
+  if (this.remainingAmount > this.amount) {
+    this.remainingAmount = this.amount;
   }
 
   // ----------------------------------------------------------
   // NEVER GO BELOW ZERO
   // ----------------------------------------------------------
 
-  if (
-    this.remainingAmount < 0
-  ) {
+  if (this.remainingAmount < 0) {
     this.remainingAmount = 0;
   }
 });
@@ -305,104 +259,75 @@ IncomeSchema.pre("save", function () {
 // GET AVAILABLE INCOME
 // ============================================================
 
-IncomeSchema.methods.getAvailableAmount =
-  function () {
-    const remaining =
-      Number(this.remainingAmount);
+IncomeSchema.methods.getAvailableAmount = function () {
+  const remaining = Number(this.remainingAmount);
 
-    if (!Number.isFinite(remaining)) {
-      return 0;
-    }
+  if (!Number.isFinite(remaining)) {
+    return 0;
+  }
 
-    return Math.max(
-      0,
-      Math.trunc(remaining)
-    );
-  };
+  return Math.max(0, Math.trunc(remaining));
+};
 
 // ============================================================
 // CHECK AVAILABLE INCOME
 // ============================================================
 
-IncomeSchema.methods.hasAvailableAmount =
-  function () {
-    return (
-      this.getAvailableAmount() > 0
-    );
-  };
+IncomeSchema.methods.hasAvailableAmount = function () {
+  return this.getAvailableAmount() > 0;
+};
 
 // ============================================================
 // USE INCOME
 // ============================================================
 
-IncomeSchema.methods.useAmount =
-  function (amount) {
-    const numericAmount =
-      Number(amount);
+IncomeSchema.methods.useAmount = function (amount) {
+  const numericAmount = Number(amount);
 
-    if (
-      !Number.isFinite(numericAmount) ||
-      !Number.isInteger(numericAmount) ||
-      numericAmount <= 0
-    ) {
-      throw new Error(
-        "Amount to use must be a positive whole number"
-      );
-    }
+  if (
+    !Number.isFinite(numericAmount) ||
+    !Number.isInteger(numericAmount) ||
+    numericAmount <= 0
+  ) {
+    throw new Error("Amount to use must be a positive whole number");
+  }
 
-    const available =
-      this.getAvailableAmount();
+  const available = this.getAvailableAmount();
 
-    if (
-      numericAmount > available
-    ) {
-      throw new Error(
-        "Insufficient remaining income"
-      );
-    }
+  if (numericAmount > available) {
+    throw new Error("Insufficient remaining income");
+  }
 
-    this.remainingAmount =
-      available - numericAmount;
+  this.remainingAmount = available - numericAmount;
 
-    if (
-      this.remainingAmount < 0
-    ) {
-      this.remainingAmount = 0;
-    }
+  if (this.remainingAmount < 0) {
+    this.remainingAmount = 0;
+  }
 
-    return this.remainingAmount;
-  };
+  return this.remainingAmount;
+};
 
 // ============================================================
 // RESTORE INCOME
 // ============================================================
 
-IncomeSchema.methods.restoreAmount =
-  function (amount) {
-    const numericAmount =
-      Number(amount);
+IncomeSchema.methods.restoreAmount = function (amount) {
+  const numericAmount = Number(amount);
 
-    if (
-      !Number.isFinite(numericAmount) ||
-      !Number.isInteger(numericAmount) ||
-      numericAmount <= 0
-    ) {
-      throw new Error(
-        "Amount to restore must be a positive whole number"
-      );
-    }
+  if (
+    !Number.isFinite(numericAmount) ||
+    !Number.isInteger(numericAmount) ||
+    numericAmount <= 0
+  ) {
+    throw new Error("Amount to restore must be a positive whole number");
+  }
 
-    const current =
-      this.getAvailableAmount();
+  const current = this.getAvailableAmount();
 
-    this.remainingAmount =
-      Math.min(
-        this.amount,
-        current + numericAmount
-      );
+  this.remainingAmount = Math.min(this.amount, current + numericAmount);
 
-    return this.remainingAmount;
-  };
+  return this.remainingAmount;
+};
 
 // ============================================================
 // INDEXES
@@ -444,8 +369,4 @@ IncomeSchema.index({
 // ============================================================
 
 module.exports =
-  mongoose.models.Income ||
-  mongoose.model(
-    "Income",
-    IncomeSchema
-  );
+  mongoose.models.Income || mongoose.model("Income", IncomeSchema);
