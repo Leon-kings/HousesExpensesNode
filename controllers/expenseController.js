@@ -4640,17 +4640,11 @@ exports.createExpense = async (req, res) => {
     // ========================================================
 
     let expense = null;
-
     let matchedBudget = null;
-
     let budgetCheck = null;
-
     let notification = null;
-
     let budgetNotification = null;
-
     let allocation = null;
-
     let totalOriginalIncome = 0;
 
     // ========================================================
@@ -4731,9 +4725,6 @@ exports.createExpense = async (req, res) => {
 
         // ====================================================
         // BUDGET CANNOT EXCEED TOTAL INCOME
-        //
-        // Equal IS allowed.
-        // Greater is NOT allowed.
         // ====================================================
 
         if (allocatedAmount > totalOriginalIncome) {
@@ -4822,7 +4813,7 @@ exports.createExpense = async (req, res) => {
         }
 
         // ====================================================
-        // EXPENSE WOULD EXCEED REMAINING BUDGET
+        // EXPENSE EXCEEDS REMAINING BUDGET
         // ====================================================
 
         if (exceeds) {
@@ -4856,7 +4847,7 @@ exports.createExpense = async (req, res) => {
       });
 
       // ======================================================
-      // BUDGET AMOUNT
+      // BUDGET AMOUNT USED
       // ======================================================
 
       const budgetAmountUsed = matchedBudget ? numericAmount : 0;
@@ -4884,29 +4875,29 @@ exports.createExpense = async (req, res) => {
 
             email: normalizedEmail,
 
-            // ----------------------------------------------
+            // --------------------------------------------
             // INCOME
-            // ----------------------------------------------
+            // --------------------------------------------
 
             incomeUsed: allocation.incomeUsed,
 
             incomeAllocations: allocation.incomeAllocations,
 
-            // ----------------------------------------------
+            // --------------------------------------------
             // SAVINGS
-            // ----------------------------------------------
+            // --------------------------------------------
 
             savingsUsed: 0,
 
             savingsAllocations: [],
 
-            // ----------------------------------------------
+            // --------------------------------------------
             // BUDGET
-            // ----------------------------------------------
+            // --------------------------------------------
 
             budgetId: matchedBudget ? matchedBudget._id : null,
 
-            budgetAmountUsed,
+            budgetAmountUsed: budgetAmountUsed,
           },
         ],
         {
@@ -4930,38 +4921,41 @@ exports.createExpense = async (req, res) => {
         });
 
         // ====================================================
-        // IMPORTANT FIX
-        //
-        // Make sure the CURRENT matchedBudget object contains
-        // the NEW values before the response is returned.
+        // FORCE CURRENT VALUES
         // ====================================================
 
         const allocatedAmount = Number(matchedBudget.allocatedAmount || 0);
 
         const spentAmount = Number(matchedBudget.spentAmount || 0);
 
-        // Calculate the NEW remaining amount
+        // ----------------------------------------------------
+        // CALCULATE ACTUAL REMAINING
+        // ----------------------------------------------------
+
         const remainingAmount = Math.max(allocatedAmount - spentAmount, 0);
 
-        // Calculate the NEW percentage
+        // ----------------------------------------------------
+        // CALCULATE PERCENTAGE USED
+        // ----------------------------------------------------
+
         const percentageUsed =
           allocatedAmount > 0
             ? Math.min((spentAmount / allocatedAmount) * 100, 100)
             : 0;
 
-        // ====================================================
-        // UPDATE THE OBJECT THAT WILL BE RETURNED
-        // ====================================================
+        // ----------------------------------------------------
+        // UPDATE OBJECT
+        // ----------------------------------------------------
 
         matchedBudget.remainingAmount = remainingAmount;
 
         matchedBudget.percentageUsed = percentageUsed;
 
-        // ====================================================
+        // ----------------------------------------------------
         // UPDATE STATUS
-        // ====================================================
+        // ----------------------------------------------------
 
-        if (spentAmount >= allocatedAmount) {
+        if (remainingAmount === 0) {
           matchedBudget.status = "over-budget";
         } else if (percentageUsed >= 80) {
           matchedBudget.status = "approaching-limit";
@@ -4969,16 +4963,23 @@ exports.createExpense = async (req, res) => {
           matchedBudget.status = "on-track";
         }
 
-        // ====================================================
-        // SAVE THE NEW VALUES
-        // ====================================================
+        // ----------------------------------------------------
+        // SAVE AGAIN
+        // ----------------------------------------------------
 
         await matchedBudget.save({
           session,
         });
 
         // ====================================================
-        // BUDGET NOTIFICATION
+        // REMAINING PERCENTAGE
+        // ====================================================
+
+        const remainingPercentage =
+          allocatedAmount > 0 ? (remainingAmount / allocatedAmount) * 100 : 0;
+
+        // ====================================================
+        // BUDGET EXHAUSTED
         // ====================================================
 
         if (remainingAmount === 0) {
@@ -4988,49 +4989,17 @@ exports.createExpense = async (req, res) => {
             title: `🚨 ${matchedBudget.category} Budget Exhausted`,
 
             message:
-              `Your ${matchedBudget.category} budget of ` +
-              `RWF ${allocatedAmount.toLocaleString()} ` +
-              `has been fully used. ` +
-              `No budget remains for this plan.`,
+              `Your ${matchedBudget.category} budget has been fully used. ` +
+              `The remaining amount is RWF 0.`,
 
             severity: "high",
           };
-        } else if (percentageUsed <= 20) {
-          // --------------------------------------------------
-          // IMPORTANT:
-          // If your requirement is based on REMAINING amount,
-          // 20% or less remaining means:
-          //
-          // remainingPercentage <= 20
-          // --------------------------------------------------
-
-          const remainingPercentage =
-            allocatedAmount > 0 ? (remainingAmount / allocatedAmount) * 100 : 0;
-
-          if (remainingPercentage <= 20) {
-            budgetNotification = {
-              level: "low",
-
-              title: `⚠️ ${matchedBudget.category} Budget Running Low`,
-
-              message:
-                `Your ${matchedBudget.category} budget is nearly exhausted. ` +
-                `Only RWF ${remainingAmount.toLocaleString()} ` +
-                `(${remainingPercentage.toFixed(2)}%) remains.`,
-
-              severity: "high",
-            };
-          }
         }
 
         // ====================================================
-        // CORRECT LOW-BUDGET CHECK
+        // BUDGET LOW
         // ====================================================
-
-        const remainingPercentage =
-          allocatedAmount > 0 ? (remainingAmount / allocatedAmount) * 100 : 0;
-
-        if (remainingAmount > 0 && remainingPercentage <= 20) {
+        else if (remainingPercentage <= 20) {
           budgetNotification = {
             level: "low",
 
@@ -5053,6 +5022,47 @@ exports.createExpense = async (req, res) => {
 
     try {
       // ======================================================
+      // CALCULATE REMAINING MESSAGE
+      // ======================================================
+
+      let expenseNotificationMessage =
+        `Expense of RWF ${numericAmount.toLocaleString()} ` +
+        `for ${normalizedCategory} was added.`;
+
+      // ======================================================
+      // ADD REMAINING BUDGET TO NORMAL NOTIFICATION
+      // ======================================================
+
+      if (matchedBudget) {
+        const remainingAmount = Number(matchedBudget.remainingAmount || 0);
+
+        const allocatedAmount = Number(matchedBudget.allocatedAmount || 0);
+
+        const remainingPercentage =
+          allocatedAmount > 0 ? (remainingAmount / allocatedAmount) * 100 : 0;
+
+        // ----------------------------------------------------
+        // BUDGET IS ZERO
+        // ----------------------------------------------------
+
+        if (remainingAmount === 0) {
+          expenseNotificationMessage +=
+            ` Your ${matchedBudget.category} budget has now been fully used. ` +
+            `Remaining amount: RWF 0.`;
+        }
+
+        // ----------------------------------------------------
+        // BUDGET STILL HAS MONEY
+        // ----------------------------------------------------
+        else {
+          expenseNotificationMessage +=
+            ` You have RWF ${remainingAmount.toLocaleString()} ` +
+            `remaining in your ${matchedBudget.category} budget ` +
+            `(${remainingPercentage.toFixed(2)}% remaining).`;
+        }
+      }
+
+      // ======================================================
       // NORMAL EXPENSE NOTIFICATION
       // ======================================================
 
@@ -5063,11 +5073,10 @@ exports.createExpense = async (req, res) => {
 
         title: "💸 Expense Added",
 
-        message:
-          `Expense of RWF ` +
-          `${numericAmount.toLocaleString()} ` +
-          `for ${normalizedCategory} ` +
-          `was added.`,
+        // IMPORTANT:
+        // The remaining amount is now inside the actual
+        // notification message.
+        message: expenseNotificationMessage,
 
         type: "expense",
 
@@ -5114,8 +5123,10 @@ exports.createExpense = async (req, res) => {
             ? Number(matchedBudget.spentAmount || 0)
             : 0,
 
-          // IMPORTANT:
-          // This now contains the NEW value.
+          // ------------------------------------------
+          // NEW REMAINING AMOUNT
+          // ------------------------------------------
+
           budgetRemaining: matchedBudget
             ? Number(matchedBudget.remainingAmount || 0)
             : 0,
@@ -5183,7 +5194,6 @@ exports.createExpense = async (req, res) => {
 
             spentAmount: Number(matchedBudget.spentAmount || 0),
 
-            // NEW REMAINING AMOUNT
             remainingAmount: Number(matchedBudget.remainingAmount || 0),
 
             percentageUsed: Number(matchedBudget.percentageUsed || 0),
@@ -5243,10 +5253,6 @@ exports.createExpense = async (req, res) => {
             ? "Expense created successfully. Warning: this budget is nearly exhausted."
             : "Expense created successfully",
 
-      // ======================================================
-      // EXPENSE
-      // ======================================================
-
       data: expense,
 
       // ======================================================
@@ -5267,10 +5273,7 @@ exports.createExpense = async (req, res) => {
 
             spentAmount: Number(matchedBudget.spentAmount || 0),
 
-            // ==================================================
-            // THIS IS NOW THE ACTUAL REMAINING AMOUNT
-            // ==================================================
-
+            // NEW REMAINING
             remainingAmount: Number(matchedBudget.remainingAmount || 0),
 
             percentageUsed: Number(matchedBudget.percentageUsed || 0),
@@ -5284,10 +5287,6 @@ exports.createExpense = async (req, res) => {
             exhausted: Number(matchedBudget.remainingAmount || 0) === 0,
 
             alertLevel: budgetNotification ? budgetNotification.level : null,
-
-            // ------------------------------------------
-            // INCOME VALIDATION
-            // ------------------------------------------
 
             totalIncome: totalOriginalIncome,
 
@@ -5518,3 +5517,21 @@ exports.createExpense = async (req, res) => {
     await session.endSession();
   }
 };
+
+let expenseNotificationMessage =
+  `Expense of RWF ${numericAmount.toLocaleString()} ` +
+  `for ${normalizedCategory} was added.`;
+
+if (matchedBudget) {
+  const remainingAmount = Number(matchedBudget.remainingAmount || 0);
+
+  if (remainingAmount === 0) {
+    expenseNotificationMessage +=
+      ` Your ${matchedBudget.category} budget has now been fully used. ` +
+      `Remaining amount: RWF 0.`;
+  } else {
+    expenseNotificationMessage +=
+      ` You have RWF ${remainingAmount.toLocaleString()} ` +
+      `remaining in your ${matchedBudget.category} budget.`;
+  }
+}
