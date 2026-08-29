@@ -5517,21 +5517,3 @@ exports.createExpense = async (req, res) => {
     await session.endSession();
   }
 };
-
-let expenseNotificationMessage =
-  `Expense of RWF ${numericAmount.toLocaleString()} ` +
-  `for ${normalizedCategory} was added.`;
-
-if (matchedBudget) {
-  const remainingAmount = Number(matchedBudget.remainingAmount || 0);
-
-  if (remainingAmount === 0) {
-    expenseNotificationMessage +=
-      ` Your ${matchedBudget.category} budget has now been fully used. ` +
-      `Remaining amount: RWF 0.`;
-  } else {
-    expenseNotificationMessage +=
-      ` You have RWF ${remainingAmount.toLocaleString()} ` +
-      `remaining in your ${matchedBudget.category} budget.`;
-  }
-}
