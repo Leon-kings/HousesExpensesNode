@@ -2702,10 +2702,6 @@ exports.bulkDeleteExpenses = async (req, res) => {
 
         deletedExpenses.push(expense.toObject());
 
-        // --------------------------------------------------
-        // DELETE
-        // --------------------------------------------------
-
         await Expense.deleteOne({
           _id: expense._id,
         }).session(session);
